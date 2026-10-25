@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { WebGPURenderer, Timer } from 'three/webgpu';
 import { createBlobGeometry, createBlobMaterial, createFallbackBlobMaterial, createProceduralEnvironment } from './scene/blob.js';
+import { createParticles } from './scene/particles.js';
+import { createPostProcessing } from './scene/postprocessing.js';
 import { initScroll, setupScrollTrigger } from './scroll/index.js';
 import { initCursor } from './ui/cursor.js';
 import { initKineticType } from './ui/typography.js';
@@ -22,6 +24,52 @@ if (debugMode) debugOverlay.classList.add('visible');
 function updateDebug(text) {
     if (debugOverlay) debugOverlay.textContent = text;
 }
+
+// ─── Quality toggle (E5a / R-008) ──────────────────────────
+function toggleQuality() {
+    currentQuality = currentQuality === 'high' ? 'low' : 'high';
+    console.info('[Liquid] toggleQuality called, new quality:', currentQuality);
+
+    // Update particles count
+    if (particles) {
+        const newCount = currentQuality === 'high' ? 2000 : 500;
+        // Dispose old geometry
+        particles.mesh.geometry.dispose();
+        particles.mesh.material.dispose();
+        scene.remove(particles.mesh);
+
+        // Create new particles
+        particles = createParticles(newCount);
+        scene.add(particles.mesh);
+    }
+
+    // Update post-processing quality
+    if (postProcessing) {
+        postProcessing.setQuality(currentQuality);
+    }
+
+    // Update blob material quality
+    if (mesh) {
+        // For TSL material, we can't easily change quality mid-flight,
+        // but we can note it for the overlay
+    }
+
+    // Update debug overlay immediately (not only on FPS tick)
+    if (debugOverlay) {
+        updateDebug(`FPS: ${fps} | Renderer: ${useFallback ? 'WebGL (fallback)' : (isWebGPU ? 'WebGPU' : 'WebGL 2')} | ${forceWebGL ? '[forced]' : ''} | Quality: ${currentQuality} | Particles: ${currentQuality === 'high' ? 2000 : 500} | PP: ${postProcessing ? 'ON' : 'OFF'} | Scene: ${currentScene.sceneIndex}`);
+    }
+
+    console.info(`[Liquid] Quality switched to: ${currentQuality}`);
+}
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'q' || e.key === 'Q') {
+        toggleQuality();
+    }
+});
+
+// Expose for testing / console access
+window.toggleLiquidQuality = toggleQuality;
 
 // ─── Loading screen ───────────────────────────────────────
 const { setLoading, hide: hideLoader } = initLoader();
@@ -45,6 +93,11 @@ let currentScene = { sceneIndex: 0, sceneProgress: 0 };
 let uiPalette = null;
 let kineticType = null;
 
+// ─── Particles & Post-processing (E5a / R-008) ────────────
+let particles = null;
+let postProcessing = null;
+let currentQuality = quality; // 'high' | 'low'
+
 // ─── Mouse tracking (R-004) ───────────────────────────────
 window.addEventListener('mousemove', (e) => {
     mouseX = (e.clientX / window.innerWidth) * 2 - 1;
@@ -63,23 +116,43 @@ async function init() {
     const canvas = document.getElementById('webgl-canvas');
     const dpr = Math.min(window.devicePixelRatio, 2);
 
-    // Try WebGPU renderer first
-    try {
-        renderer = new WebGPURenderer({
-            canvas,
-            antialias: true,
-            alpha: false,
-            forceWebGL: forceWebGL,
-        });
+    // Try WebGPU renderer first, but only if WebGPU is actually available.
+    // We check for a real adapter AND device (not just a stub).
+    let hasWebGPU = false;
+    if (!forceWebGL && typeof navigator !== 'undefined') {
+        try {
+            const adapter = await navigator.gpu?.requestAdapter();
+            if (adapter) {
+                // Verify with device request (stub adapters fail here)
+                const device = await adapter.requestDevice();
+                hasWebGPU = !!device;
+            }
+        } catch {
+            hasWebGPU = false;
+        }
+    }
 
-        isWebGPU = !forceWebGL;
-        renderer.setPixelRatio(dpr);
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        await renderer.init();
-    } catch (webgpuError) {
-        console.warn('[Liquid] WebGPU/WebGL 2 unavailable, falling back to WebGL renderer.', webgpuError.message);
+    if (hasWebGPU) {
+        try {
+            renderer = new WebGPURenderer({
+                canvas,
+                antialias: true,
+                alpha: false,
+                forceWebGL: forceWebGL,
+            });
 
-        // Fallback: standard WebGLRenderer + MeshPhysicalMaterial (no TSL nodes)
+            isWebGPU = true;
+            renderer.setPixelRatio(dpr);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            await renderer.init();
+        } catch (webgpuError) {
+            console.warn('[Liquid] WebGPU init failed, falling back to WebGL renderer.', webgpuError.message);
+            renderer = null;
+        }
+    }
+
+    // Use standard WebGLRenderer if WebGPU was unavailable or failed
+    if (!renderer) {
         renderer = new THREE.WebGLRenderer({
             canvas,
             antialias: true,
@@ -89,6 +162,7 @@ async function init() {
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setClearColor('#0a0a0a', 1);
         useFallback = true;
+        isWebGPU = false;
     }
 
     setLoading(30);
@@ -132,6 +206,21 @@ async function init() {
     mesh = new THREE.Mesh(geometry, material);
     scene.add(mesh);
 
+    // ─── Particles (E5a / R-008) ────────────────────────────
+    const particleCount = quality === 'high' ? 2000 : 500;
+    particles = createParticles(particleCount);
+    scene.add(particles.mesh);
+
+    // ─── Post-processing: bloom + chromatic aberration (E5a) ──
+    // EffectComposer / UnrealBloomPass / ShaderPass są WebGL-only.
+    // Działają tylko gdy renderer to WebGLRenderer (fallback).
+    const isWebGLRenderer = renderer instanceof THREE.WebGLRenderer;
+    if (isWebGLRenderer) {
+        postProcessing = createPostProcessing(
+            renderer, scene, camera, window.innerWidth, window.innerHeight, quality
+        );
+    }
+
     // ─── UI: palettes (R-006) driven by the current scene ─────
     uiPalette = initUIPalette(
         () => currentScene,
@@ -174,7 +263,7 @@ async function init() {
             fps = frameCount;
             frameCount = 0;
             lastTime = time;
-            updateDebug(`FPS: ${fps} | Renderer: ${useFallback ? 'WebGL (fallback)' : (isWebGPU ? 'WebGPU' : 'WebGL 2')} | ${forceWebGL ? '[forced]' : ''} | Quality: ${quality} | Scene: ${currentScene.sceneIndex}`);
+            updateDebug(`FPS: ${fps} | Renderer: ${useFallback ? 'WebGL (fallback)' : (isWebGPU ? 'WebGPU' : 'WebGL 2')} | ${forceWebGL ? '[forced]' : ''} | Quality: ${currentQuality} | Particles: ${currentQuality === 'high' ? 2000 : 500} | PP: ${postProcessing ? 'ON' : 'OFF'} | Scene: ${currentScene.sceneIndex}`);
         }
 
         // Update timer (replaces THREE.Clock)
@@ -209,13 +298,24 @@ async function init() {
         mesh.rotation.y = elapsed * 0.1;
         mesh.rotation.x = Math.sin(elapsed * 0.07) * 0.1;
 
-        // Scene-based camera offset (scroll morph R-005)
+        // ── Particles update (E5a / R-008) ─────────────────
         const si = currentScene.sceneIndex;
         const sp = currentScene.sceneProgress;
+        if (particles) {
+            particles.setUniforms(si, sp);
+            particles.updateTime(elapsed);
+        }
+
+        // Scene-based camera offset (scroll morph R-005)
         camera.position.y = si * 0.15 + Math.sin(sp * Math.PI) * 0.3;
         camera.position.x = Math.sin(si * 0.8 + sp * 0.5) * 0.2;
 
-        renderer.render(scene, camera);
+        // ── Render: composer (with post-processing) or direct ──
+        if (postProcessing) {
+            postProcessing.composer.render();
+        } else {
+            renderer.render(scene, camera);
+        }
     }
 
     setLoading(100);
@@ -238,6 +338,9 @@ function onResize() {
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
+    if (postProcessing) {
+        postProcessing.setSize(w, h);
+    }
 }
 
 // ─── Start ────────────────────────────────────────────────
