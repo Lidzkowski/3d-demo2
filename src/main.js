@@ -56,7 +56,8 @@ function toggleQuality() {
 
     // Update debug overlay immediately (not only on FPS tick)
     if (debugOverlay) {
-        updateDebug(`FPS: ${fps} | Renderer: ${useFallback ? 'WebGL (fallback)' : (isWebGPU ? 'WebGPU' : 'WebGL 2')} | ${forceWebGL ? '[forced]' : ''} | Quality: ${currentQuality} | Particles: ${currentQuality === 'high' ? 2000 : 500} | PP: ${postProcessing ? 'ON' : 'OFF'} | Scene: ${currentScene.sceneIndex}`);
+        const particleInfo = isWebGLRenderer ? (currentQuality === 'high' ? 2000 : 500) : 'N/A';
+        updateDebug(`FPS: ${fps} | Renderer: ${useFallback ? 'WebGL (fallback)' : (isWebGPU ? 'WebGPU' : 'WebGL 2')} | ${forceWebGL ? '[forced]' : ''} | Quality: ${currentQuality} | Particles: ${particleInfo} | PP: ${postProcessing ? 'ON' : 'OFF'} | Scene: ${currentScene.sceneIndex}`);
     }
 
     console.info(`[Liquid] Quality switched to: ${currentQuality}`);
@@ -206,10 +207,12 @@ async function init() {
     mesh = new THREE.Mesh(geometry, material);
     scene.add(mesh);
 
-    // ─── Particles (E5a / R-008) ────────────────────────────
+    // ─── Particles (E5a / R-008) — ShaderMaterial = WebGL-only ──
     const particleCount = quality === 'high' ? 2000 : 500;
-    particles = createParticles(particleCount);
-    scene.add(particles.mesh);
+    if (isWebGLRenderer) {
+        particles = createParticles(particleCount);
+        scene.add(particles.mesh);
+    }
 
     // ─── Post-processing: bloom + chromatic aberration (E5a) ──
     // EffectComposer / UnrealBloomPass / ShaderPass są WebGL-only.
@@ -263,7 +266,7 @@ async function init() {
             fps = frameCount;
             frameCount = 0;
             lastTime = time;
-            updateDebug(`FPS: ${fps} | Renderer: ${useFallback ? 'WebGL (fallback)' : (isWebGPU ? 'WebGPU' : 'WebGL 2')} | ${forceWebGL ? '[forced]' : ''} | Quality: ${currentQuality} | Particles: ${currentQuality === 'high' ? 2000 : 500} | PP: ${postProcessing ? 'ON' : 'OFF'} | Scene: ${currentScene.sceneIndex}`);
+            updateDebug(`FPS: ${fps} | Renderer: ${useFallback ? 'WebGL (fallback)' : (isWebGPU ? 'WebGPU' : 'WebGL 2')} | ${forceWebGL ? '[forced]' : ''} | Quality: ${currentQuality} | Particles: ${isWebGLRenderer ? (currentQuality === 'high' ? 2000 : 500) : 'N/A'} | PP: ${postProcessing ? 'ON' : 'OFF'} | Scene: ${currentScene.sceneIndex}`);
         }
 
         // Update timer (replaces THREE.Clock)
@@ -298,10 +301,10 @@ async function init() {
         mesh.rotation.y = elapsed * 0.1;
         mesh.rotation.x = Math.sin(elapsed * 0.07) * 0.1;
 
-        // ── Particles update (E5a / R-008) ─────────────────
+        // ── Particles update (E5a / R-008) — WebGL-only ──────
         const si = currentScene.sceneIndex;
         const sp = currentScene.sceneProgress;
-        if (particles) {
+        if (isWebGLRenderer && particles) {
             particles.setUniforms(si, sp);
             particles.updateTime(elapsed);
         }
