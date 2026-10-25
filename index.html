@@ -119,6 +119,35 @@
 
   <div id="debug-overlay"></div>
 
+  <!-- Sound toggle (E5b / R-010) -->
+  <button id="sound-toggle" class="sound-toggle" aria-label="Toggle UI sounds" title="Toggle sounds">
+    <svg id="sound-icon-mute" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+      <line x1="23" y1="9" x2="17" y2="15"/>
+      <line x1="17" y1="9" x2="23" y2="15"/>
+    </svg>
+    <svg id="sound-icon-on" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+      <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+      <path d="M19.07 4.93a10 10 0 010 14.14"/>
+      <path d="M15.54 8.46a5 5 0 010 7.07"/>
+    </svg>
+  </button>
+
+  <!-- Noscript fallback (E5b / R-011) -->
+  <noscript>
+    <div id="noscript-content">
+      <style>
+        #noscript-content{position:fixed;inset:0;z-index:500;background:#0a0a0f;color:#eceaf2;font-family:'Space Grotesk Variable',system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem;gap:1.5rem}
+        #noscript-content h1{font-size:clamp(2rem,5vw,4rem);font-weight:600;letter-spacing:-0.03em}
+        #noscript-content p{max-width:50ch;font-size:clamp(1rem,2vw,1.3rem);line-height:1.6;color:#8b8798}
+        #noscript-content a{color:#8b5cf6}
+      </style>
+      <h1>Liquid</h1>
+      <p>This is a generative WebGL showcase: one living form, five scenes, three palettes — built by <strong>John Doe</strong>, Creative Developer.</p>
+      <p>This experience requires JavaScript and WebGL. <a href="https://webglreport.com/">Check WebGL support</a> or <a href="https://developer.chrome.com/docs/web-platform/webgpu/getting-started">try Chrome with WebGPU enabled</a>.</p>
+    </div>
+  </noscript>
+
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

@@ -8,6 +8,17 @@ import { initCursor } from './ui/cursor.js';
 import { initKineticType } from './ui/typography.js';
 import { initUIPalette } from './ui/palette.js';
 import { initLoader } from './ui/loader.js';
+import {
+    getAdaptiveDpr,
+    recordFrame,
+    getCurrentFps,
+    getQualityTarget,
+    createVisibilityGuard,
+    reducedMotion,
+    isMobile,
+} from './ui/adaptive-quality.js';
+import { initAudio, playClick, playHover, playScroll, toggleMute, setMute, enabled as soundEnabled } from './ui/sounds.js';
+import { reducedMotion as a11yReducedMotion } from './ui/accessibility.js';
 import '@fontsource-variable/space-grotesk';
 import './styles/base.css';
 
@@ -25,7 +36,21 @@ function updateDebug(text) {
     if (debugOverlay) debugOverlay.textContent = text;
 }
 
-// ─── Quality toggle (E5a / R-008) ──────────────────────────
+// ─── Quality toggle (E5a / R-008) + adaptive quality (E5b / R-009) ──
+let currentQuality = quality; // 'high' | 'low'
+let lastQualityDegrade = 0;  // throttling for quality degradation
+
+// E5b: visibility guard for render pause
+const visibilityGuard = createVisibilityGuard();
+let shouldRender = true;
+
+// E5b: mobile mode detection — simplify rendering
+const mobileMode = isMobile || a11yReducedMotion;
+if (mobileMode) {
+    document.documentElement.classList.add('mobile-mode');
+    document.documentElement.dataset.mobile = 'true';
+}
+
 function toggleQuality() {
     currentQuality = currentQuality === 'high' ? 'low' : 'high';
     console.info('[Liquid] toggleQuality called, new quality:', currentQuality);
@@ -43,7 +68,7 @@ function toggleQuality() {
         scene.add(particles.mesh);
     }
 
-    // Update post-processing quality
+    // Update post-processing quality (mobile mode: no PP)
     if (postProcessing) {
         postProcessing.setQuality(currentQuality);
     }
@@ -57,7 +82,7 @@ function toggleQuality() {
     // Update debug overlay immediately (not only on FPS tick)
     if (debugOverlay) {
         const particleInfo = isWebGLRenderer ? (currentQuality === 'high' ? 2000 : 500) : 'N/A';
-        updateDebug(`FPS: ${fps} | Renderer: ${useFallback ? 'WebGL (fallback)' : (isWebGPU ? 'WebGPU' : 'WebGL 2')} | ${forceWebGL ? '[forced]' : ''} | Quality: ${currentQuality} | Particles: ${particleInfo} | PP: ${postProcessing ? 'ON' : 'OFF'} | Scene: ${currentScene.sceneIndex}`);
+        updateDebug(`FPS: ${fps} | Renderer: ${useFallback ? 'WebGL (fallback)' : (isWebGPU ? 'WebGPU' : 'WebGL 2')} | ${forceWebGL ? '[forced]' : ''} | Quality: ${currentQuality} | Particles: ${particleInfo} | PP: ${postProcessing ? 'ON' : 'OFF'} | Mobile: ${mobileMode} | Motion: ${a11yReducedMotion}`);
     }
 
     console.info(`[Liquid] Quality switched to: ${currentQuality}`);
@@ -71,6 +96,33 @@ window.addEventListener('keydown', (e) => {
 
 // Expose for testing / console access
 window.toggleLiquidQuality = toggleQuality;
+
+// ─── E5b: Sound gesture & toggle ──────────────────────────────
+let soundGestureHandled = false;
+const soundToggleBtn = document.getElementById('sound-toggle');
+
+function handleSoundGesture() {
+    if (soundGestureHandled) return;
+    soundGestureHandled = true;
+    initAudio();
+}
+
+// First user gesture enables sound
+document.addEventListener('click', handleSoundGesture, { once: true, passive: true });
+document.addEventListener('touchstart', handleSoundGesture, { once: true, passive: true });
+document.addEventListener('keydown', handleSoundGesture, { once: true, passive: true });
+
+// Sound toggle button
+if (soundToggleBtn) {
+    soundToggleBtn.classList.add('is-mute'); // default: muted off (no sound until gesture)
+
+    soundToggleBtn.addEventListener('click', () => {
+        if (!soundEnabled) return;
+        const newMuted = toggleMute();
+        soundToggleBtn.classList.toggle('is-mute', newMuted);
+        soundToggleBtn.setAttribute('aria-label', newMuted ? 'Enable UI sounds' : 'Disable UI sounds');
+    }, { passive: true });
+}
 
 // ─── Loading screen ───────────────────────────────────────
 const { setLoading, hide: hideLoader } = initLoader();
@@ -97,25 +149,38 @@ let kineticType = null;
 // ─── Particles & Post-processing (E5a / R-008) ────────────
 let particles = null;
 let postProcessing = null;
-let currentQuality = quality; // 'high' | 'low'
 
 // ─── Mouse tracking (R-004) ───────────────────────────────
 window.addEventListener('mousemove', (e) => {
     mouseX = (e.clientX / window.innerWidth) * 2 - 1;
     mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
-});
+}, { passive: true });
+
+// E5b: hover sound — throttled
+let lastHoverSound = 0;
+window.addEventListener('mouseover', (e) => {
+    const now = performance.now();
+    if (now - lastHoverSound < 300) return;
+    lastHoverSound = now;
+    const el = e.target;
+    if (el.closest('a, button, .palette-card, input, textarea')) {
+        playHover();
+    }
+}, { passive: true });
 
 // Click impulse (R-004) — set impulse to 1, decays in animation loop
+// E5b: also trigger click sound
 window.addEventListener('click', () => {
     impulse = 1;
-});
+    playClick();
+}, { passive: true });
 
 // ─── Renderer ─────────────────────────────────────────────
 async function init() {
     setLoading(10);
 
     const canvas = document.getElementById('webgl-canvas');
-    const dpr = Math.min(window.devicePixelRatio, 2);
+    const dpr = getAdaptiveDpr(window.devicePixelRatio);
 
     // Try WebGPU renderer first, but only if WebGPU is actually available.
     // We check for a real adapter AND device (not just a stub).
@@ -210,16 +275,21 @@ async function init() {
     // ─── Post-processing: bloom + chromatic aberration (E5a) ──
     // EffectComposer / UnrealBloomPass / ShaderPass są WebGL-only.
     // Działają tylko gdy renderer to WebGLRenderer (fallback).
+    // E5b / R-012: mobile mode — no post-processing
     const isWebGLRenderer = renderer instanceof THREE.WebGLRenderer;
 
     // ─── Particles (E5a / R-008) — ShaderMaterial = WebGL-only ──
-    const particleCount = quality === 'high' ? 2000 : 500;
+    // E5b / R-012: mobile mode — drastically fewer particles
+    let particleCount = quality === 'high' ? 2000 : 500;
+    if (mobileMode) {
+        particleCount = 250;
+    }
     if (isWebGLRenderer) {
         particles = createParticles(particleCount);
         scene.add(particles.mesh);
     }
 
-    if (isWebGLRenderer) {
+    if (isWebGLRenderer && !mobileMode) {
         postProcessing = createPostProcessing(
             renderer, scene, camera, window.innerWidth, window.innerHeight, quality
         );
@@ -257,9 +327,19 @@ async function init() {
     let frameCount = 0;
     let lastTime = performance.now();
     let fps = 0;
+    let frameSkip = 0; // frame skipping when offscreen
 
     function animate(time) {
         animFrameId = requestAnimationFrame(animate);
+
+        // E5b / R-009: pause rendering when tab hidden or canvas off-screen
+        shouldRender = visibilityGuard.shouldRender();
+        if (!shouldRender) {
+            return; // skip entire frame
+        }
+
+        // E5b: record frame for adaptive quality monitoring
+        recordFrame(time);
 
         // FPS counter
         frameCount++;
@@ -267,7 +347,36 @@ async function init() {
             fps = frameCount;
             frameCount = 0;
             lastTime = time;
-            updateDebug(`FPS: ${fps} | Renderer: ${useFallback ? 'WebGL (fallback)' : (isWebGPU ? 'WebGPU' : 'WebGL 2')} | ${forceWebGL ? '[forced]' : ''} | Quality: ${currentQuality} | Particles: ${isWebGLRenderer ? (currentQuality === 'high' ? 2000 : 500) : 'N/A'} | PP: ${postProcessing ? 'ON' : 'OFF'} | Scene: ${currentScene.sceneIndex}`);
+
+            // E5b: adaptive quality — degrade if FPS too low
+            const currentFps = getCurrentFps();
+            const qualityTarget = getQualityTarget(currentFps);
+            if (qualityTarget && qualityTarget !== currentQuality) {
+                const now = performance.now();
+                if (now - lastQualityDegrade > 5000) { // throttle 5s
+                    lastQualityDegrade = now;
+                    currentQuality = qualityTarget;
+                    console.info(`[Liquid] Adaptive quality → ${currentQuality} (FPS: ${Math.round(currentFps)})`);
+
+                    // Rebuild particles with new count
+                    if (particles && isWebGLRenderer) {
+                        particles.mesh.geometry.dispose();
+                        particles.mesh.material.dispose();
+                        scene.remove(particles.mesh);
+                        particles = createParticles(
+                            currentQuality === 'high' ? 2000 : 500
+                        );
+                        scene.add(particles.mesh);
+                    }
+
+                    // Update post-processing quality
+                    if (postProcessing) {
+                        postProcessing.setQuality(currentQuality);
+                    }
+                }
+            }
+
+            updateDebug(`FPS: ${fps} | Renderer: ${useFallback ? 'WebGL (fallback)' : (isWebGPU ? 'WebGPU' : 'WebGL 2')} | ${forceWebGL ? '[forced]' : ''} | Quality: ${currentQuality} | ${currentFps > 0 ? 'Adaptive: ' + Math.round(currentFps) + 'fps' : ''} | Particles: ${isWebGLRenderer ? (currentQuality === 'high' ? 2000 : 500) : 'N/A'} | PP: ${postProcessing ? 'ON' : 'OFF'} | Mobile: ${mobileMode} | Motion: ${a11yReducedMotion} | Scene: ${currentScene.sceneIndex}`);
         }
 
         // Update timer (replaces THREE.Clock)
@@ -277,6 +386,8 @@ async function init() {
         if (scrollModule) {
             scrollModule.render(time);
             currentScene = scrollModule.getCurrentScene();
+            // E5b: scroll sound (throttled inside playScroll)
+            if (isWebGLRenderer) playScroll();
         }
 
         // ── Palette update (R-006) ──────────────────────────

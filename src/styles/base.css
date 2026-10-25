@@ -409,3 +409,69 @@ body.has-custom-cursor.is-pressing #cursor-dot { transform-origin: center; scale
   .palette-cards { grid-template-columns: 1fr; }
   .section { padding: var(--space-3) var(--gutter); }
 }
+
+/* ─── E5b: Sound Toggle Button ────────────────────────────────── */
+.sound-toggle {
+    position: fixed;
+    bottom: var(--space-2);
+    right: var(--gutter);
+    z-index: 100;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: rgba(10, 10, 15, 0.85);
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: border-color var(--dur-fast) var(--ease-out),
+        color var(--dur-fast) var(--ease-out),
+        background-color var(--dur-fast) var(--ease-out);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+.sound-toggle:hover {
+    border-color: var(--accent);
+    color: var(--text);
+    background: rgba(10, 10, 15, 0.95);
+}
+.sound-toggle:focus-visible {
+    outline: 2px solid var(--accent-2);
+    outline-offset: 3px;
+}
+.sound-toggle.is-mute #sound-icon-mute { display: block; }
+.sound-toggle.is-mute #sound-icon-on { display: none; }
+.sound-toggle:not(.is-mute) #sound-icon-mute { display: none; }
+.sound-toggle:not(.is-mute) #sound-icon-on { display: block; }
+
+/* ─── E5b: Noscript content ───────────────────────────────────── */
+#noscript-content { display: none; } /* hidden by default; noscript makes it visible */
+
+/* ─── E5b: Reduced motion ────────────────────────────────────── */
+.reduced-motion .scroll-cue-line::after {
+    animation: none;
+}
+.reduced-motion .section-title,
+.reduced-motion .label,
+.reduced-motion .section-copy {
+    opacity: 1 !important;
+    transform: none !important;
+}
+
+/* ─── E5b: Keyboard focus styles ─────────────────────────────── */
+.keyboard-focus .palette-card:focus-visible,
+.keyboard-focus .btn:focus-visible,
+.keyboard-focus .sound-toggle:focus-visible {
+    outline: 2px solid var(--accent-2);
+    outline-offset: 4px;
+}
+
+/* ─── E5b: Mobile mode ───────────────────────────────────────── */
+.mobile-mode .sound-toggle {
+    bottom: 1rem;
+    right: 1rem;
+    width: 40px;
+    height: 40px;
+}

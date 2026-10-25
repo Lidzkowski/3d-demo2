@@ -2,9 +2,13 @@
 // Custom cursor: instant dot + lagged ring. Elements marked
 // [data-magnet] attract the ring (and lean toward the pointer).
 // Desktop only (fine pointer); native cursor otherwise.
+// E5b: skip on reduced-motion.
+
+import { reducedMotion } from './adaptive-quality.js';
 
 export function initCursor() {
     if (!window.matchMedia('(pointer: fine)').matches) return null;
+    if (reducedMotion) return null;
 
     const dot = document.createElement('div');
     dot.id = 'cursor-dot';

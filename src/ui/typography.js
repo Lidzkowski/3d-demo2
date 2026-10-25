@@ -5,6 +5,7 @@
 //  - Section labels/titles/copy: clip-reveal on enter, subtle parallax.
 // Splitting is manual (no SplitText plugin): each word → .kin-line,
 // each char → .kin-char.
+// E5b: skip animations when prefers-reduced-motion.
 
 import gsap from 'gsap';
 import ScrollTrigger from 'gsap/ScrollTrigger';
@@ -32,6 +33,22 @@ function split(el) {
 
 export function initKineticType() {
     let revealed = false;
+
+    // E5b: skip GSAP animations when reduced-motion is preferred
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reducedMotion) {
+        // Ensure all kinetic elements are immediately visible
+        document.querySelectorAll('[data-kinetic]').forEach((el) => {
+            el.style.opacity = '';
+            el.style.transform = '';
+        });
+        const heroTitle = document.getElementById('hero-title');
+        if (heroTitle) {
+            heroTitle.style.opacity = '';
+            heroTitle.style.transform = '';
+        }
+        return { reveal: () => {} };
+    }
 
     const heroTitle = document.getElementById('hero-title');
     const heroChars = heroTitle ? split(heroTitle) : [];
