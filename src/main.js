@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { WebGPURenderer, Timer } from 'three/webgpu';
 import { createBlobGeometry, createBlobMaterial, createProceduralEnvironment } from './scene/blob.js';
+import { initScroll, setupScrollTrigger } from './scroll/index.js';
 
 // ─── URL Params ───────────────────────────────────────────
 const urlParams = new URLSearchParams(window.location.search);
@@ -30,6 +31,26 @@ let scene, camera, mesh;
 let animFrameId;
 let isWebGPU = false;
 
+// ─── Cursor state (R-004) ─────────────────────────────────
+let mouseX = 0, mouseY = 0;       // normalized device coords [-1, 1]
+let impulse = 0;                  // click impulse 0→1, decays each frame
+
+// ─── Scroll state (R-005) ─────────────────────────────────
+let scrollModule = null;
+let currentScene = { sceneIndex: 0, sceneProgress: 0 };
+
+// ─── Mouse tracking (R-004) ───────────────────────────────
+window.addEventListener('mousemove', (e) => {
+    mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+    mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+});
+
+// Click impulse (R-004) — set impulse to 1, decays in animation loop
+window.addEventListener('click', () => {
+    impulse = 1;
+});
+
+// ─── Renderer ─────────────────────────────────────────────
 async function init() {
     setLoading(10);
 
@@ -68,12 +89,12 @@ async function init() {
     scene.add(pointLight1);
 
     const pointLight2 = new THREE.PointLight(0xff4488, 1.5, 15);
-    pointLight2.position.set(-3, -1, 2);
     scene.add(pointLight2);
+    pointLight2.position.set(-3, -1, 2);
 
     const pointLight3 = new THREE.PointLight(0x44ff88, 1, 15);
-    pointLight3.position.set(0, 3, -3);
     scene.add(pointLight3);
+    pointLight3.position.set(0, 3, -3);
 
     // Camera: z=6 gives comfortable margin around blob (radius ~2.2 max)
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
@@ -96,6 +117,12 @@ async function init() {
 
     setLoading(70);
 
+    // ─── Scroll integration (R-005) ─────────────────────────
+    scrollModule = initScroll();
+    setupScrollTrigger();
+
+    setLoading(80);
+
     // ─── Start render loop ──────────────────────────────────
     const timer = new Timer();
     let frameCount = 0;
@@ -111,16 +138,36 @@ async function init() {
             fps = frameCount;
             frameCount = 0;
             lastTime = time;
-            updateDebug(`FPS: ${fps} | Renderer: ${isWebGPU ? 'WebGPU' : 'WebGL 2'} | ${forceWebGL ? '[forced]' : ''} | Quality: ${quality}`);
+            updateDebug(`FPS: ${fps} | Renderer: ${isWebGPU ? 'WebGPU' : 'WebGL 2'} | ${forceWebGL ? '[forced]' : ''} | Quality: ${quality} | Scene: ${currentScene.sceneIndex}`);
         }
 
         // Update timer (replaces THREE.Clock)
         timer.update(time);
 
-        // Animate blob (TSL displacement + gentle rotation)
+        // ── Lenis update (single animation loop) ───────────
+        if (scrollModule) {
+            scrollModule.render();
+            currentScene = scrollModule.getCurrentScene();
+        }
+
+        // ── Cursor interaction (R-004) ─────────────────────
+        // Decay impulse (click pulse fades over ~1.5s)
         const elapsed = timer.getElapsed();
+        impulse *= Math.max(0, 1 - elapsed * 0.8);
+
+        // Update material with mouse + impulse
+        mesh.material.setMouse(mouseX, mouseY);
+        mesh.material.setImpulse(impulse);
+
+        // Animate blob (TSL displacement + gentle rotation)
         mesh.rotation.y = elapsed * 0.1;
         mesh.rotation.x = Math.sin(elapsed * 0.07) * 0.1;
+
+        // Scene-based camera offset (scroll morph R-005)
+        const si = currentScene.sceneIndex;
+        const sp = currentScene.sceneProgress;
+        camera.position.y = si * 0.15 + Math.sin(sp * Math.PI) * 0.3;
+        camera.position.x = Math.sin(si * 0.8 + sp * 0.5) * 0.2;
 
         renderer.render(scene, camera);
     }
