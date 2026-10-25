@@ -207,6 +207,11 @@ async function init() {
     mesh = new THREE.Mesh(geometry, material);
     scene.add(mesh);
 
+    // ─── Post-processing: bloom + chromatic aberration (E5a) ──
+    // EffectComposer / UnrealBloomPass / ShaderPass są WebGL-only.
+    // Działają tylko gdy renderer to WebGLRenderer (fallback).
+    const isWebGLRenderer = renderer instanceof THREE.WebGLRenderer;
+
     // ─── Particles (E5a / R-008) — ShaderMaterial = WebGL-only ──
     const particleCount = quality === 'high' ? 2000 : 500;
     if (isWebGLRenderer) {
@@ -214,10 +219,6 @@ async function init() {
         scene.add(particles.mesh);
     }
 
-    // ─── Post-processing: bloom + chromatic aberration (E5a) ──
-    // EffectComposer / UnrealBloomPass / ShaderPass są WebGL-only.
-    // Działają tylko gdy renderer to WebGLRenderer (fallback).
-    const isWebGLRenderer = renderer instanceof THREE.WebGLRenderer;
     if (isWebGLRenderer) {
         postProcessing = createPostProcessing(
             renderer, scene, camera, window.innerWidth, window.innerHeight, quality
