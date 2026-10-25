@@ -1,11 +1,12 @@
 import * as THREE from 'three';
-import { WebGPURenderer } from 'three/webgpu';
+import { WebGPURenderer, Timer } from 'three/webgpu';
 import { createBlobGeometry, createBlobMaterial, createProceduralEnvironment } from './scene/blob.js';
 
 // ─── URL Params ───────────────────────────────────────────
 const urlParams = new URLSearchParams(window.location.search);
 const forceWebGL = urlParams.has('renderer') && urlParams.get('renderer') === 'webgl';
 const debugMode = urlParams.has('debug');
+const quality = urlParams.get('quality') || 'high';
 
 // ─── Debug overlay ────────────────────────────────────────
 const debugOverlay = document.getElementById('debug-overlay');
@@ -74,9 +75,9 @@ async function init() {
     pointLight3.position.set(0, 3, -3);
     scene.add(pointLight3);
 
-    // Camera
+    // Camera: z=6 gives comfortable margin around blob (radius ~2.2 max)
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.set(0, 0, 5);
+    camera.position.set(0, 0, 6);
 
     // ─── Procedural environment for glass-metal reflections ──
     const envMap = createProceduralEnvironment(renderer);
@@ -84,7 +85,7 @@ async function init() {
 
     // ─── Generative blob: TSL displacement + glass-metal ───
     const geometry = createBlobGeometry(64);
-    const material = createBlobMaterial();
+    const material = createBlobMaterial(quality);
     mesh = new THREE.Mesh(geometry, material);
     scene.add(mesh);
 
@@ -96,7 +97,7 @@ async function init() {
     setLoading(70);
 
     // ─── Start render loop ──────────────────────────────────
-    const clock = new THREE.Clock();
+    const timer = new Timer();
     let frameCount = 0;
     let lastTime = performance.now();
     let fps = 0;
@@ -110,11 +111,14 @@ async function init() {
             fps = frameCount;
             frameCount = 0;
             lastTime = time;
-            updateDebug(`FPS: ${fps} | Renderer: ${isWebGPU ? 'WebGPU' : 'WebGL 2'} | ${forceWebGL ? '[forced]' : ''}`);
+            updateDebug(`FPS: ${fps} | Renderer: ${isWebGPU ? 'WebGPU' : 'WebGL 2'} | ${forceWebGL ? '[forced]' : ''} | Quality: ${quality}`);
         }
 
+        // Update timer (replaces THREE.Clock)
+        timer.update(time);
+
         // Animate blob (TSL displacement + gentle rotation)
-        const elapsed = clock.getElapsedTime();
+        const elapsed = timer.getElapsed();
         mesh.rotation.y = elapsed * 0.1;
         mesh.rotation.x = Math.sin(elapsed * 0.07) * 0.1;
 
