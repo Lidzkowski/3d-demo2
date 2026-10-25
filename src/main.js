@@ -205,6 +205,7 @@ async function init() {
         }
 
         // Animate blob (TSL displacement + gentle rotation)
+        const elapsed = timer.getElapsed();
         mesh.rotation.y = elapsed * 0.1;
         mesh.rotation.x = Math.sin(elapsed * 0.07) * 0.1;
 
