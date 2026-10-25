@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { WebGPURenderer } from 'three/webgpu';
+import { createBlobGeometry, createBlobMaterial } from './scene/blob.js';
 
 // ─── URL Params ───────────────────────────────────────────
 const urlParams = new URLSearchParams(window.location.search);
@@ -79,28 +80,37 @@ async function init() {
   setLoading(30);
 
   // ─── Scene ──────────────────────────────────────────────
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color('#0a0a0a');
+  const blobScene = new THREE.Scene();
+  blobScene.background = new THREE.Color('#0a0a0a');
 
+  // Subtle lights for shader interaction
+  const ambientLight = new THREE.AmbientLight(0x404060, 0.5);
+  blobScene.add(ambientLight);
+
+  const pointLight1 = new THREE.PointLight(0x4488ff, 2, 15);
+  pointLight1.position.set(3, 2, 3);
+  blobScene.add(pointLight1);
+
+  const pointLight2 = new THREE.PointLight(0xff4488, 1.5, 15);
+  pointLight2.position.set(-3, -1, 2);
+  blobScene.add(pointLight2);
+
+  const pointLight3 = new THREE.PointLight(0x44ff88, 1, 15);
+  pointLight3.position.set(0, 3, -3);
+  blobScene.add(pointLight3);
+
+  // Camera
   camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
   camera.position.set(0, 0, 5);
 
-  // ─── Test geometry: rotating icosahedron ─────────────────
-  const geometry = new THREE.IcosahedronGeometry(1.5, 32);
-  const material = new THREE.MeshBasicMaterial({
-    color: 0x4488ff,
-    wireframe: true
-  });
+  // ─── Generative blob: 3D noise displacement + TSL material ─
+  const geometry = createBlobGeometry(64);
+  const material = createBlobMaterial();
   mesh = new THREE.Mesh(geometry, material);
-  scene.add(mesh);
+  blobScene.add(mesh);
 
-  // ─── Lights (for WebGL rendering) ───────────────────────
-  const ambientLight = new THREE.AmbientLight(0x404040, 1);
-  scene.add(ambientLight);
-
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-  directionalLight.position.set(2, 3, 4);
-  scene.add(directionalLight);
+  // Use blob scene as main scene
+  scene = blobScene;
 
   setLoading(50);
 
@@ -110,6 +120,7 @@ async function init() {
   setLoading(70);
 
   // ─── Start render loop ──────────────────────────────────
+  const clock = new THREE.Clock();
   let frameCount = 0;
   let lastTime = performance.now();
   let fps = 0;
@@ -126,9 +137,11 @@ async function init() {
       updateDebug(`FPS: ${fps} | Renderer: ${isWebGPU ? 'WebGPU' : 'WebGL 2'} | ${forceWebGL ? '[forced]' : ''}`);
     }
 
-    // Rotate test mesh
-    mesh.rotation.x += 0.003;
-    mesh.rotation.y += 0.005;
+    // Animate blob (noise displacement + gentle rotation)
+    const elapsed = clock.getElapsedTime();
+    mesh.material.uniforms.uTime.value = elapsed;
+    mesh.rotation.y = elapsed * 0.1;
+    mesh.rotation.x = Math.sin(elapsed * 0.07) * 0.1;
 
     renderer.render(scene, camera);
   }
