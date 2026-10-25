@@ -35,24 +35,11 @@ async function init() {
   const canvas = document.getElementById('webgl-canvas');
   const dpr = Math.min(window.devicePixelRatio, 2);
 
-  // Try WebGPU first, fallback to WebGL 2
+  // Try WebGPU (unified renderer handles backend selection)
   try {
-    if (!forceWebGL && navigator.gpu) {
-      const adapter = await navigator.gpu.requestAdapter();
-      if (adapter) {
-        const device = await adapter.requestDevice();
-        const context = canvas.getContext('webgpu');
-        if (context) {
-          const format = navigator.gpu.getPreferredCanvasFormat();
-          context.configure({
-            device,
-            format,
-            alphaMode: 'premultiplied'
-          });
-          renderer = new WebGPURenderer({ canvas, context, format });
-          isWebGPU = true;
-        }
-      }
+    if (!forceWebGL) {
+      renderer = new WebGPURenderer({ canvas, antialias: true, alpha: false });
+      isWebGPU = true;
     }
   } catch (e) {
     // WebGPU not available or failed, continue to WebGL fallback
