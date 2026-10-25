@@ -27,11 +27,23 @@ export function createFallbackBlobMaterial(quality = 'high') {
         side: THREE.DoubleSide,
     });
 
+    // ─── Palette interface (E4 / R-006) ─────────────────────
+    // Fallback material: body color + emissive tint from the gradient stops.
+    const _fallbackColor = new THREE.Color();
+    const _fallbackEmissive = new THREE.Color();
+    material.setPalette = function (stopsHex) {
+        if (!Array.isArray(stopsHex) || stopsHex.length < 3) return;
+        _fallbackColor.setHex(stopsHex[1]);
+        _fallbackEmissive.setHex(stopsHex[2]);
+        material.color.copy(_fallbackColor);
+        material.emissive.copy(_fallbackEmissive).multiplyScalar(0.25);
+    };
+
     return material;
 }
 
 const {
-    float, vec3,
+    float, vec3, uniform,
     mx_fractal_noise_float,
     positionLocal, normalLocal,
     normalize, max, pow, mix, smoothstep, sin, dot,
@@ -96,15 +108,19 @@ export function createBlobMaterial(quality = 'high') {
         material.positionNode = material.positionNode.add(normalLocal.normalize().mul(mouseDisp.add(impulseWave)));
     }
 
-    // ─── Base color: displacement-based gradient (deep purple → teal → violet) ───
-    // Darker interior, brighter peaks for higher contrast
+    // ─── Base color: displacement-based gradient, palette-driven (E4) ───
+    // Three uniform stops (interior → mid → peaks), initialized to the
+    // E2 gradient. initUIPalette() eases them via setPalette() while the
+    // Palette scene is active.
     const t = displacement.mul(float(1.5)).add(float(0.5));
-    const color1 = vec3(float(0.03), float(0.01), float(0.07));    // very dark #080214
-    const color2 = vec3(float(0.051), float(0.309), float(0.431));  // teal #0d4f6e
-    const color3 = vec3(float(0.176), float(0.106), float(0.412));  // violet #2d1b69
+    const _paletteColor = new THREE.Color();
+    const paletteStops = [0x080214, 0x0d4f6e, 0x2d1b69].map((hex) => {
+        _paletteColor.setHex(hex);
+        return uniform(new THREE.Vector3(_paletteColor.r, _paletteColor.g, _paletteColor.b));
+    });
 
-    const baseColor = mix(color1, color2, smoothstep(float(0.0), float(0.5), t));
-    const finalColor = mix(baseColor, color3, smoothstep(float(0.5), float(1.0), t));
+    const baseColor = mix(paletteStops[0], paletteStops[1], smoothstep(float(0.0), float(0.5), t));
+    const finalColor = mix(baseColor, paletteStops[2], smoothstep(float(0.5), float(1.0), t));
 
     material.colorNode = finalColor;
 
@@ -190,6 +206,17 @@ export function createBlobMaterial(quality = 'high') {
     material.attenuationColor = isLow ? new THREE.Color(1.0) : new THREE.Color(0.6, 0.8, 1.0);
     material.transparent = true;
     material.side = THREE.DoubleSide;
+
+    // ─── Palette interface (E4 / R-006) ─────────────────────
+    // setPalette([hex1, hex2, hex3]) — gradient stops for the base color.
+    const _stopColor = new THREE.Color();
+    material.setPalette = function (stopsHex) {
+        if (!Array.isArray(stopsHex) || stopsHex.length < 3) return;
+        for (let i = 0; i < 3; i++) {
+            _stopColor.setHex(stopsHex[i]);
+            paletteStops[i].value.set(_stopColor.r, _stopColor.g, _stopColor.b);
+        }
+    };
 
     // ─── Cursor interaction helpers (R-004) ─────────────────
     // setMouse(nx, ny) — normalized device coords [-1, 1]

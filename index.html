@@ -3,27 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Liquid Showcase</title>
-  <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow-x: hidden; background: #0a0a0a; color: #e0e0e0; font-family: system-ui, sans-serif; }
-    #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-    canvas { display: block; width: 100%; height: 100%; }
-    #scroll-container { position: relative; z-index: 2; }
-    .section { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
-    #debug-overlay { position: fixed; top: 10px; right: 10px; z-index: 100; background: rgba(0,0,0,0.7); color: #0f0; padding: 8px 12px; font-family: monospace; font-size: 12px; border-radius: 4px; display: none; pointer-events: none; }
-    #debug-overlay.visible { display: block; }
-    #loading-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; background: #0a0a0a; display: flex; align-items: center; justify-content: center; flex-direction: column; transition: opacity 0.5s ease; }
-    #loading-screen.hidden { opacity: 0; pointer-events: none; }
-    #loading-bar { width: 200px; height: 3px; background: #333; border-radius: 2px; margin-top: 1rem; overflow: hidden; }
-    #loading-progress { width: 0%; height: 100%; background: #e0e0e0; transition: width 0.3s ease; }
-    #loading-text { font-size: 14px; color: #888; letter-spacing: 0.1em; text-transform: uppercase; }
-  </style>
+  <title>Liquid — John Doe, Creative Developer</title>
+  <meta name="description" content="A generative WebGL showcase: one living form, five scenes, three palettes." />
 </head>
 <body>
-  <div id="loading-screen">
-    <div id="loading-text">Loading</div>
-    <div id="loading-bar"><div id="loading-progress"></div></div>
+  <div id="loading-screen" role="status" aria-live="polite">
+    <div class="loading-brand">Liquid</div>
+    <div class="loading-bar"><div id="loading-progress"></div></div>
+    <div id="loading-text">Preparing the form — 0%</div>
   </div>
 
   <div id="canvas-container">
@@ -31,13 +18,103 @@
   </div>
 
   <div id="scroll-container">
-    <section class="section" id="hero">
-      <h1 style="font-size: clamp(2rem, 6vw, 5rem); text-align: center; font-weight: 300; letter-spacing: -0.02em;">Liquid</h1>
+    <!-- 1 ── Hero -->
+    <section class="section section--hero" id="hero">
+      <div class="hero-inner">
+        <p class="label hero-label" data-kinetic>John Doe — Creative Developer</p>
+        <h1 class="hero-title" id="hero-title" data-kinetic>Liquid</h1>
+        <p class="hero-sub" data-kinetic>A generative WebGL showcase. One living form, five scenes, three palettes.</p>
+      </div>
+      <div class="scroll-cue" aria-hidden="true">
+        <span class="scroll-cue-line"></span>
+        <span class="scroll-cue-text">Scroll</span>
+      </div>
+      <p class="hero-meta">WebGPU / WebGL2 · TSL · Lenis</p>
     </section>
-    <section class="section" id="morph"></section>
-    <section class="section" id="flow"></section>
-    <section class="section" id="palette"></section>
-    <section class="section" id="contact"></section>
+
+    <!-- 2 ── Morph -->
+    <section class="section section--morph" id="morph">
+      <div class="section-inner section-inner--left">
+        <p class="label" data-kinetic>01 / Morph</p>
+        <h2 class="section-title" data-kinetic>Form<br />finds flow.</h2>
+        <p class="section-copy" data-kinetic>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor
+          incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.</p>
+      </div>
+    </section>
+
+    <!-- 3 ── Flow -->
+    <section class="section section--flow" id="flow">
+      <div class="section-inner section-inner--right">
+        <p class="label" data-kinetic>02 / Flow</p>
+        <h2 class="section-title" data-kinetic>Motion as<br />language.</h2>
+        <p class="section-copy" data-kinetic>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
+          fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident.</p>
+      </div>
+    </section>
+
+    <!-- 4 ── Palette -->
+    <section class="section section--palette" id="palette">
+      <div class="section-inner section-inner--left">
+        <p class="label" data-kinetic>03 / Palette</p>
+        <h2 class="section-title" data-kinetic>Three moods<br />of light.</h2>
+      </div>
+      <div class="palette-cards">
+        <div class="palette-card" data-magnet data-palette-card="0">
+          <div class="palette-swatches">
+            <span class="swatch" style="--sw:#8b5cf6"></span>
+            <span class="swatch" style="--sw:#2dd4bf"></span>
+            <span class="swatch" style="--sw:#150a2e"></span>
+          </div>
+          <span class="palette-name">Violet Drift</span>
+        </div>
+        <div class="palette-card" data-magnet data-palette-card="1">
+          <div class="palette-swatches">
+            <span class="swatch" style="--sw:#ff5e3a"></span>
+            <span class="swatch" style="--sw:#ffb35c"></span>
+            <span class="swatch" style="--sw:#1a0705"></span>
+          </div>
+          <span class="palette-name">Ember Glass</span>
+        </div>
+        <div class="palette-card" data-magnet data-palette-card="2">
+          <div class="palette-swatches">
+            <span class="swatch" style="--sw:#38bdf8"></span>
+            <span class="swatch" style="--sw:#a5f3fc"></span>
+            <span class="swatch" style="--sw:#071019"></span>
+          </div>
+          <span class="palette-name">Glacier</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 ── Contact -->
+    <section class="section section--contact" id="contact">
+      <div class="section-inner section-inner--left">
+        <p class="label" data-kinetic>04 / Contact</p>
+        <h2 class="section-title" data-kinetic>Let&rsquo;s make<br />something liquid.</h2>
+        <form class="contact-form" id="contact-form" data-visual-only aria-label="Contact form (visual only)">
+          <div class="form-row">
+            <label class="field">
+              <span class="field-label">Name</span>
+              <input type="text" name="name" placeholder="Your name" data-magnet />
+            </label>
+            <label class="field">
+              <span class="field-label">Email</span>
+              <input type="email" name="email" placeholder="you@studio.com" data-magnet />
+            </label>
+          </div>
+          <label class="field">
+            <span class="field-label">Message</span>
+            <textarea name="message" rows="3" placeholder="Tell me about your project" data-magnet></textarea>
+          </label>
+          <button type="button" class="btn btn--send" data-magnet data-hover>Send</button>
+        </form>
+      </div>
+      <footer class="footer">
+        <span>&copy; 2026 John Doe</span>
+        <span>hello@johndoe.dev</span>
+        <span>Built with WebGPU &middot; No cookies, no trackers</span>
+      </footer>
+    </section>
   </div>
 
   <div id="debug-overlay"></div>

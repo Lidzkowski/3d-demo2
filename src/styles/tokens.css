@@ -1,0 +1,72 @@
+/* ─── Design tokens (E4 / R-006) ─────────────────────────────────
+   Fluid typography via clamp(); three palettes switched in the
+   Palette scene via <html data-palette="p0|p1|p2">.
+   p0 = default (Violet Drift) — also the resting state of all other scenes. */
+
+:root {
+  /* Typography — fluid */
+  --step--1: clamp(0.82rem, 0.79rem + 0.15vw, 0.95rem);
+  --step-0:  clamp(1rem, 0.95rem + 0.27vw, 1.2rem);
+  --step-1:  clamp(1.2rem, 1.1rem + 0.5vw, 1.55rem);
+  --step-2:  clamp(1.45rem, 1.25rem + 1vw, 2.1rem);
+  --step-3:  clamp(1.8rem, 1.5rem + 1.6vw, 2.9rem);
+  --step-4:  clamp(2.2rem, 1.8rem + 2.6vw, 4.2rem);
+  --step-5:  clamp(2.8rem, 2.2rem + 4vw, 6rem);
+  --step-6:  clamp(4rem, 3rem + 8vw, 11rem);
+  --step-7:  clamp(5.5rem, 3.5rem + 14vw, 18rem);
+
+  /* Rhythm */
+  --space-1: clamp(0.5rem, 0.4rem + 0.5vw, 1rem);
+  --space-2: clamp(1rem, 0.8rem + 1vw, 2rem);
+  --space-3: clamp(2rem, 1.5rem + 2.5vw, 4.5rem);
+  --space-4: clamp(3rem, 2rem + 5vw, 8rem);
+  --gutter:  clamp(1.25rem, 4vw, 5rem);
+
+  /* Type character */
+  --font-display: 'Space Grotesk Variable', 'Space Grotesk', system-ui, sans-serif;
+  --track-tight: -0.03em;
+  --track-label: 0.22em;
+
+  /* Transitions */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 250ms;
+  --dur-med: 500ms;
+  --dur-slow: 900ms;
+}
+
+/* ── Palette p0 — Violet Drift (default) ── */
+:root,
+:root[data-palette='p0'] {
+  --bg: #0a0a0f;
+  --text: #eceaf2;
+  --muted: #8b8798;
+  --line: rgba(236, 234, 242, 0.14);
+  --accent: #8b5cf6;
+  --accent-2: #2dd4bf;
+  --accent-3: #4cc9f0;
+  --glow: rgba(139, 92, 246, 0.22);
+}
+
+/* ── Palette p1 — Ember Glass ── */
+:root[data-palette='p1'] {
+  --bg: #0d0908;
+  --text: #f4ede8;
+  --muted: #9a8f88;
+  --line: rgba(244, 237, 232, 0.14);
+  --accent: #ff5e3a;
+  --accent-2: #ffb35c;
+  --accent-3: #ff2e63;
+  --glow: rgba(255, 94, 58, 0.2);
+}
+
+/* ── Palette p2 — Glacier ── */
+:root[data-palette='p2'] {
+  --bg: #070a0e;
+  --text: #e8f1f7;
+  --muted: #8698a8;
+  --line: rgba(232, 241, 247, 0.14);
+  --accent: #38bdf8;
+  --accent-2: #a5f3fc;
+  --accent-3: #818cf8;
+  --glow: rgba(56, 189, 248, 0.2);
+}

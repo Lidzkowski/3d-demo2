@@ -2,6 +2,12 @@ import * as THREE from 'three';
 import { WebGPURenderer, Timer } from 'three/webgpu';
 import { createBlobGeometry, createBlobMaterial, createFallbackBlobMaterial, createProceduralEnvironment } from './scene/blob.js';
 import { initScroll, setupScrollTrigger } from './scroll/index.js';
+import { initCursor } from './ui/cursor.js';
+import { initKineticType } from './ui/typography.js';
+import { initUIPalette } from './ui/palette.js';
+import { initLoader } from './ui/loader.js';
+import '@fontsource-variable/space-grotesk';
+import './styles/base.css';
 
 // ─── URL Params ───────────────────────────────────────────
 const urlParams = new URLSearchParams(window.location.search);
@@ -18,12 +24,7 @@ function updateDebug(text) {
 }
 
 // ─── Loading screen ───────────────────────────────────────
-const loadingScreen = document.getElementById('loading-screen');
-const loadingProgress = document.getElementById('loading-progress');
-
-function setLoading(pct) {
-    loadingProgress.style.width = `${pct}%`;
-}
+const { setLoading, hide: hideLoader } = initLoader();
 
 // ─── Renderer ─────────────────────────────────────────────
 let renderer;
@@ -39,6 +40,10 @@ let impulse = 0;                  // click impulse 0→1, decays each frame
 // ─── Scroll state (R-005) ─────────────────────────────────
 let scrollModule = null;
 let currentScene = { sceneIndex: 0, sceneProgress: 0 };
+
+// ─── UI state (R-006, R-007) ──────────────────────────────
+let uiPalette = null;
+let kineticType = null;
 
 // ─── Mouse tracking (R-004) ───────────────────────────────
 window.addEventListener('mousemove', (e) => {
@@ -127,6 +132,20 @@ async function init() {
     mesh = new THREE.Mesh(geometry, material);
     scene.add(mesh);
 
+    // ─── UI: palettes (R-006) driven by the current scene ─────
+    uiPalette = initUIPalette(
+        () => currentScene,
+        (stops) => {
+            if (typeof mesh.material.setPalette === 'function') {
+                mesh.material.setPalette(stops);
+            }
+        }
+    );
+
+    // ─── UI: magnetic cursor + kinetic typography (R-007) ─────
+    initCursor();
+    kineticType = initKineticType();
+
     setLoading(50);
 
     // ─── Resize handler ─────────────────────────────────────
@@ -167,6 +186,11 @@ async function init() {
             currentScene = scrollModule.getCurrentScene();
         }
 
+        // ── Palette update (R-006) ──────────────────────────
+        if (uiPalette) {
+            uiPalette.update(timer.getDelta());
+        }
+
         // ── Cursor interaction (R-004) ─────────────────────
         // Decay impulse (click pulse fades over ~1.5s)
         const elapsed = timer.getElapsed();
@@ -195,9 +219,10 @@ async function init() {
 
     setLoading(100);
 
-    // Hide loading screen
+    // Hide loading screen, then run the kinetic reveal
     setTimeout(() => {
-        loadingScreen.classList.add('hidden');
+        hideLoader();
+        if (kineticType) kineticType.reveal();
     }, 500);
 
     animate(performance.now());
