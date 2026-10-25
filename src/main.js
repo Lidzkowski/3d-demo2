@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { WebGPURenderer, Timer } from 'three/webgpu';
-import { createBlobGeometry, createBlobMaterial, createProceduralEnvironment } from './scene/blob.js';
+import { createBlobGeometry, createBlobMaterial, createFallbackBlobMaterial, createProceduralEnvironment } from './scene/blob.js';
 import { initScroll, setupScrollTrigger } from './scroll/index.js';
 
 // ─── URL Params ───────────────────────────────────────────
@@ -30,6 +30,7 @@ let renderer;
 let scene, camera, mesh;
 let animFrameId;
 let isWebGPU = false;
+let useFallback = false;
 
 // ─── Cursor state (R-004) ─────────────────────────────────
 let mouseX = 0, mouseY = 0;       // normalized device coords [-1, 1]
@@ -57,22 +58,33 @@ async function init() {
     const canvas = document.getElementById('webgl-canvas');
     const dpr = Math.min(window.devicePixelRatio, 2);
 
-    // WebGPURenderer (unified renderer handles backend selection)
-    // forceWebGL option forces WebGL 2 backend when ?renderer=webgl
-    // Both backends use the same TSL node material — no GLSL needed
-    renderer = new WebGPURenderer({
-        canvas,
-        antialias: true,
-        alpha: false,
-        forceWebGL: forceWebGL,
-    });
+    // Try WebGPU renderer first
+    try {
+        renderer = new WebGPURenderer({
+            canvas,
+            antialias: true,
+            alpha: false,
+            forceWebGL: forceWebGL,
+        });
 
-    isWebGPU = !forceWebGL;
-    renderer.setPixelRatio(dpr);
-    renderer.setSize(window.innerWidth, window.innerHeight);
+        isWebGPU = !forceWebGL;
+        renderer.setPixelRatio(dpr);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        await renderer.init();
+    } catch (webgpuError) {
+        console.warn('[Liquid] WebGPU/WebGL 2 unavailable, falling back to WebGL renderer.', webgpuError.message);
 
-    // Initialize the renderer backend (required before any rendering)
-    await renderer.init();
+        // Fallback: standard WebGLRenderer + MeshPhysicalMaterial (no TSL nodes)
+        renderer = new THREE.WebGLRenderer({
+            canvas,
+            antialias: true,
+            alpha: false,
+        });
+        renderer.setPixelRatio(dpr);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor('#0a0a0a', 1);
+        useFallback = true;
+    }
 
     setLoading(30);
 
@@ -101,12 +113,17 @@ async function init() {
     camera.position.set(0, 0, 6);
 
     // ─── Procedural environment for glass-metal reflections ──
-    const envMap = createProceduralEnvironment(renderer);
-    scene.environment = envMap;
+    // (Only needed for TSL node material; fallback uses direct material properties)
+    if (!useFallback) {
+        const envMap = createProceduralEnvironment(renderer);
+        scene.environment = envMap;
+    }
 
-    // ─── Generative blob: TSL displacement + glass-metal ───
+    // ─── Generative blob: TSL displacement + glass-metal (or fallback) ───
     const geometry = createBlobGeometry(64);
-    const material = createBlobMaterial(quality);
+    const material = useFallback
+        ? createFallbackBlobMaterial(quality)
+        : createBlobMaterial(quality);
     mesh = new THREE.Mesh(geometry, material);
     scene.add(mesh);
 
@@ -138,7 +155,7 @@ async function init() {
             fps = frameCount;
             frameCount = 0;
             lastTime = time;
-            updateDebug(`FPS: ${fps} | Renderer: ${isWebGPU ? 'WebGPU' : 'WebGL 2'} | ${forceWebGL ? '[forced]' : ''} | Quality: ${quality} | Scene: ${currentScene.sceneIndex}`);
+            updateDebug(`FPS: ${fps} | Renderer: ${useFallback ? 'WebGL (fallback)' : (isWebGPU ? 'WebGPU' : 'WebGL 2')} | ${forceWebGL ? '[forced]' : ''} | Quality: ${quality} | Scene: ${currentScene.sceneIndex}`);
         }
 
         // Update timer (replaces THREE.Clock)
@@ -155,9 +172,13 @@ async function init() {
         const elapsed = timer.getElapsed();
         impulse *= Math.max(0, 1 - elapsed * 0.8);
 
-        // Update material with mouse + impulse
-        mesh.material.setMouse(mouseX, mouseY);
-        mesh.material.setImpulse(impulse);
+        // Update material with mouse + impulse (only on TSL node material)
+        if (typeof mesh.material.setMouse === 'function') {
+            mesh.material.setMouse(mouseX, mouseY);
+        }
+        if (typeof mesh.material.setImpulse === 'function') {
+            mesh.material.setImpulse(impulse);
+        }
 
         // Animate blob (TSL displacement + gentle rotation)
         mesh.rotation.y = elapsed * 0.1;
@@ -182,7 +203,7 @@ async function init() {
     animate(performance.now());
 
     // Log renderer info
-    console.info(`[Liquid] Renderer: ${isWebGPU ? 'WebGPU' : 'WebGL 2'} | Force: ${forceWebGL} | Debug: ${debugMode}`);
+    console.info(`[Liquid] Renderer: ${useFallback ? 'WebGL (fallback)' : (isWebGPU ? 'WebGPU' : 'WebGL 2')} | Force: ${forceWebGL} | Debug: ${debugMode}`);
 }
 
 function onResize() {
@@ -195,6 +216,6 @@ function onResize() {
 
 // ─── Start ────────────────────────────────────────────────
 init().catch(err => {
-    console.error('[Liquid] Initialization failed:', err);
-    document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#f44;font-family:system-ui;padding:2rem;text-align:center;">WebGPU or WebGL 2 is not supported on this device.<br>Please try Chrome or Safari.</div>`;
+    console.error('[Liquid] Rendering failed — no WebGPU or WebGL 2 available.', err.message);
+    document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#f44;font-family:system-ui;padding:2rem;text-align:center;max-width:600px;line-height:1.6;">Rendering not supported on this device.<br>Please try the latest Chrome or Safari.<br><br><span style="color:#888;font-size:13px;">Error: ${err.message}</span></div>`;
 });

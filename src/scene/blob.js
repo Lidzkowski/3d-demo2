@@ -1,6 +1,35 @@
 import * as THREE from 'three';
 import { MeshPhysicalNodeMaterial, PMREMGenerator, TSL } from 'three/webgpu';
 
+// ─── Fallback material for WebGL (no TSL nodes) ───────────
+// Used when WebGPU/WebGL 2 backend is unavailable.
+export function createFallbackBlobMaterial(quality = 'high') {
+    const isLow = quality === 'low';
+
+    const material = new THREE.MeshPhysicalMaterial({
+        color: new THREE.Color(0x1a0a30),
+        metalness: 0.92,
+        roughness: 0.08,
+        transmission: isLow ? 0.0 : 0.75,
+        ior: 1.52,
+        thickness: isLow ? 0.0 : 1.2,
+        attenuationDistance: isLow ? 0.0 : 3.0,
+        attenuationColor: new THREE.Color(isLow ? 1.0 : 0.6, isLow ? 1.0 : 0.8, isLow ? 1.0 : 1.0),
+        clearcoat: 0.8,
+        clearcoatRoughness: 0.05,
+        iridescence: isLow ? 0.0 : 0.6,
+        iridescenceIOR: 1.3,
+        iridescenceThickness: isLow ? 0.0 : 0.3,
+        sheen: isLow ? 0.0 : 0.15,
+        sheenRoughness: isLow ? 1.0 : 0.4,
+        dispersion: isLow ? 0.0 : 0.08,
+        transparent: true,
+        side: THREE.DoubleSide,
+    });
+
+    return material;
+}
+
 const {
     float, vec3,
     mx_fractal_noise_float,
