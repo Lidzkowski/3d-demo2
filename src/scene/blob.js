@@ -65,34 +65,36 @@ export function createBlobMaterial(quality = 'high') {
     material.positionNode = pos.add(normalLocal.normalize().mul(displacement));
 
     // ─── Mouse proximity displacement (R-004) ───────────────
-    // Uniforms for mouse interaction
+    // Uniforms for mouse interaction — guard against missing uniforms
     const mouseUniform = material.uniforms;
-    if (!mouseUniform.mouse) {
-        mouseUniform.mouse = { value: new THREE.Vector2(0, 0) };
+    if (mouseUniform) {
+        if (!mouseUniform.mouse) {
+            mouseUniform.mouse = { value: new THREE.Vector2(0, 0) };
+        }
+        const mousePos = mouseUniform.mouse.value;
+
+        // Use positionLocal (base vertex, no displacement) to avoid
+        // circular dependency: modelViewPosition depends on positionNode.
+        const baseVert = pos;
+        const mouseInfluence = float(1.5);
+        const mouseFalloff = float(0.6);
+        // Project mouse to 3D at vertex depth using base vertex
+        const mvBase = cameraPosition.add(cameraPosition.z.mul(vec3(mousePos.x, mousePos.y, float(1.0))));
+        const vertView = cameraPosition.add(cameraPosition.z.mul(vec3(baseVert.x, baseVert.y, float(1.0))));
+        const mouseDist = vertView.sub(mvBase).length();
+        const mouseDisp = pow(exp(float(-mouseDist.mul(float(1.0)).div(mouseFalloff).pow(float(2.0)))), float(1.0)).mul(mouseInfluence);
+
+        // ─── Click impulse wave (R-004) ─────────────────────────
+        // impulse uniform: float 0-1, set from main.js on click
+        if (!mouseUniform.impulse) {
+            mouseUniform.impulse = { value: 0 };
+        }
+        const impulseVal = mouseUniform.impulse.value;
+        const impulseWave = sin(mouseDist.sub(impulseVal.mul(float(3.0)))).mul(impulseVal).mul(float(0.5));
+
+        // Add mouse + impulse to base positionNode (don't replace)
+        material.positionNode = material.positionNode.add(normalLocal.normalize().mul(mouseDisp.add(impulseWave)));
     }
-    const mousePos = mouseUniform.mouse.value;
-
-    // Use positionLocal (base vertex, no displacement) to avoid
-    // circular dependency: modelViewPosition depends on positionNode.
-    const baseVert = pos;
-    const mouseInfluence = float(1.5);
-    const mouseFalloff = float(0.6);
-    // Project mouse to 3D at vertex depth using base vertex
-    const mvBase = cameraPosition.add(cameraPosition.z.mul(vec3(mousePos.x, mousePos.y, float(1.0))));
-    const vertView = cameraPosition.add(cameraPosition.z.mul(vec3(baseVert.x, baseVert.y, float(1.0))));
-    const mouseDist = vertView.sub(mvBase).length();
-    const mouseDisp = pow(exp(float(-mouseDist.mul(float(1.0)).div(mouseFalloff).pow(float(2.0)))), float(1.0)).mul(mouseInfluence);
-
-    // ─── Click impulse wave (R-004) ─────────────────────────
-    // impulse uniform: float 0-1, set from main.js on click
-    if (!mouseUniform.impulse) {
-        mouseUniform.impulse = { value: 0 };
-    }
-    const impulseVal = mouseUniform.impulse.value;
-    const impulseWave = sin(mouseDist.sub(impulseVal.mul(float(3.0)))).mul(impulseVal).mul(float(0.5));
-
-    // Add mouse + impulse to base positionNode (don't replace)
-    material.positionNode = material.positionNode.add(normalLocal.normalize().mul(mouseDisp.add(impulseWave)));
 
     // ─── Base color: displacement-based gradient (deep purple → teal → violet) ───
     // Darker interior, brighter peaks for higher contrast
@@ -191,13 +193,15 @@ export function createBlobMaterial(quality = 'high') {
 
     // ─── Cursor interaction helpers (R-004) ─────────────────
     // setMouse(nx, ny) — normalized device coords [-1, 1]
-    material.setMouse = function(nx, ny) {
-        mouseUniform.mouse.value.set(nx, ny);
-    };
-    // setImpulse(v) — click impulse 0→1, decays in main.js
-    material.setImpulse = function(v) {
-        mouseUniform.impulse.value = v;
-    };
+    if (mouseUniform) {
+        material.setMouse = function(nx, ny) {
+            mouseUniform.mouse.value.set(nx, ny);
+        };
+        // setImpulse(v) — click impulse 0→1, decays in main.js
+        material.setImpulse = function(v) {
+            mouseUniform.impulse.value = v;
+        };
+    }
 
     return material;
 }

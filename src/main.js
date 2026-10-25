@@ -216,6 +216,7 @@ function onResize() {
 
 // ─── Start ────────────────────────────────────────────────
 init().catch(err => {
-    console.error('[Liquid] Rendering failed — no WebGPU or WebGL 2 available.', err.message);
-    document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#f44;font-family:system-ui;padding:2rem;text-align:center;max-width:600px;line-height:1.6;">Rendering not supported on this device.<br>Please try the latest Chrome or Safari.<br><br><span style="color:#888;font-size:13px;">Error: ${err.message}</span></div>`;
+    const msg = err?.message || String(err);
+    console.error('[Liquid] Rendering failed — no WebGPU or WebGL 2 available.', msg);
+    document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#f44;font-family:system-ui;padding:2rem;text-align:center;max-width:600px;line-height:1.6;">Rendering not supported on this device.<br>Please try the latest Chrome or Safari.<br><br><span style="color:#888;font-size:13px;">Error: ${msg}</span></div>`;
 });
