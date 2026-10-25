@@ -193,8 +193,8 @@ async function init() {
 
         // ── Cursor interaction (R-004) ─────────────────────
         // Decay impulse (click pulse fades over ~1.5s)
-        const elapsed = timer.getElapsed();
-        impulse *= Math.max(0, 1 - elapsed * 0.8);
+        const delta = timer.getDelta();
+        impulse *= Math.max(0, 1 - delta * 0.8);
 
         // Update material with mouse + impulse (only on TSL node material)
         if (typeof mesh.material.setMouse === 'function') {

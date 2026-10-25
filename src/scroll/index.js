@@ -1,4 +1,8 @@
 import Lenis from 'lenis';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
 
 // ─── Scroll integration: Lenis + ScrollTrigger (R-005) ────
 // Single animation loop: Lenis.update(dt) + ScrollTrigger.checkAll()
@@ -74,11 +78,6 @@ function render(time) {
 // ─── GSAP ScrollTrigger setup (R-005) ────────────────────
 // Triggers for each scene section — used for scene detection.
 export function setupScrollTrigger() {
-    if (typeof gsap === 'undefined') return;
-
-    const ScrollTrigger = gsap.plugins?.scrollTrigger;
-    if (!ScrollTrigger) return;
-
     ScrollTrigger.create({
         trigger: '#hero',
         start: 'top top',
