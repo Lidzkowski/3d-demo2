@@ -65,9 +65,9 @@ function updateScrollPosition(target) {
     }
 }
 
-function render() {
-    if (lenis) {
-        lenis.render();
+function render(time) {
+    if (lenis && time !== undefined) {
+        lenis.raf(time);
     }
 }
 

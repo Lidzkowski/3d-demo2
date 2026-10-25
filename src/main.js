@@ -163,7 +163,7 @@ async function init() {
 
         // ── Lenis update (single animation loop) ───────────
         if (scrollModule) {
-            scrollModule.render();
+            scrollModule.render(time);
             currentScene = scrollModule.getCurrentScene();
         }
 
