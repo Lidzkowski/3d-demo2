@@ -15,7 +15,7 @@ export function createBlobMaterial() {
 
     // ─── Displacement: multi-octave TSL fractal noise ───
     const pos = positionLocal;
-    const time = mx_timer;
+    const time = TSL.time;
 
     const noise1 = mx_fractal_noise_float(
         pos.mul(float(0.8)).add(time.mul(float(0.25))),
