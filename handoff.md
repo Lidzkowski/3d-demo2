@@ -28,9 +28,9 @@ Otwarte/blokery/stop: brak.
 
 ## Sprawdzenia i Git
 Testy: V-021 **PASS** (build exit 0; statyczny audyt hero tracking CSS+GSAP bez kolizji; audyt łańcucha klik→paleta poprawny). V-013/V-014 aktualne (grep CDN: 0 hitów; build OK).
-Repo/gałąź/baza/checkpoint: main; HEAD przed: 98bc76c; commit rundy 2: zobacz hash poniżej (drzewo czyste).
+Repo/gałąź/baza/checkpoint: main; HEAD przed: 98bc76c; commit rundy 2: **be9c6f1** (drzewo czyste).
 Staged: jawnie: handoff.md, verification.md, src/styles/base.css, src/ui/typography.js (bez node_modules/dane/sekrety; docs/ gitignored).
-Hash checkpointu: 98bc76c (przed) → NOWY (runda 2, 4 pliki).
+Hash checkpointu: 98bc76c (przed) → **be9c6f1** (runda 2, 4 pliki, 26+/26-).
 
 ## Wznowienie
 1. Użytkownik: hard refresh (Cmd+Shift+R) i test: (a) napis „LIQUID” bez nakładania, (b) klik karty palety → akcenty UI + blob zmieniają kolor, `.is-active` wskazuje wybrana karta.
