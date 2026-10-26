@@ -1,40 +1,38 @@
 # Bieżący stan — jedyna pamięć robocza
 Projekt: SHOWCASE-LIQUID-001 | Pakiet: 1.1 | Data: 2026-10-26 | Profil: L2
-Aktualizacja: 2026-10-26 (naprawa 3 błędów zgłoszonych przez użytkownika — ZAKOŃCZONE)
-Etap/podzadanie: Poprawki błędów (zadanie użytkownika): 1→2→3 wykonane
+Aktualizacja: 2026-10-26 (re-test użytkownika: litery + klik kart — naprawione/ zdiagnozowane)
+Etap/podzadanie: Poprawki błędów (zadanie użytkownika): runda 2
 Status: GOTOWE
-Model ostatniego wykonawcy: Qwen3.6-35B-A3B-4bit (omlx)
+Model ostatniego wykonawcy: Swift-Qwen3.8-27B-Q4_K_M (omlx)
 Następny model: Qwen3.6-35B-A3B-4bit (omlx/Qwen3.6-35B-A3B-4bit)
 Odpowiedź użytkownika: BRAK
 
 ## Cel i stan
-Zadanie użytkownika — 3 błądy naprawione po kolei:
+Użytkownik po re-teście zgłosił: (1) litery napisu głównego nadal na sobie; (2) kolory nadal nie zmieniają się po kliknięciu karty.
 
-| # | Błąd | Pliki zmienione | Naprawa | Status |
-|---|------|-----------------|---------|--------|
-| 1 | Główny napis — litery nachodziły na siebie | `src/styles/base.css`, `src/ui/typography.js` | tracking hero -0.045em → -0.02em (CSS + GSAP scrub spójne: -0.02em → 0em) | NAPRAWIONE |
-| 2 | Kolor zmieniał się tylko raz; klik karty nie działał (scena nadpisywała) | `src/ui/palette.js` | osobny `applySelection()` (wybór sceniczny, bez side-effects) vs `select()` (klik karty → `userSelected` lock); w `update()`: manualLocked wygrywa wszędzie (incl. scena Palette); poza sceną trzyma `sceneTarget`; kolejne kliki działają i się utrzymują | NAPRAWIONE |
-| 3 | Wydajność animacji i sceny (płynnie na słabym sprzęcie, bez utraty jakości) | `src/main.js`, `src/scene/postprocessing.js` | (a) keyLight.castShadow usunięte — brak odbiorników cieni w scenie = zero zmiany wizualnej, oszczędność całego shadow pass/klatkę; (b) adaptacyjny pixelRatio `applyRendererDpr()`: low→min(dpr,1.5), high→min(dpr,2), sync `uPixelRatio` cząstek + `composer.setSize`; (c) bloom UnrealBloomPass w połowie rozdzielczości (override setSize ×0.5, RT bazowe pełne) — glow niedostrzegalnie ten sam, ~4x tańsze rozmycie; (d) `timer.getDelta()` raz na klatkę | NAPRAWIONE |
-
-⚠️ Commit zawiera **również wcześniejsze niezcommittowane zmiany użytkownika** (`src/main.js` oświetlenie studio, `src/scene/blob.js` tuning materiałów, `src/scene/postprocessing.js` wartości bloom, `src/ui/palette.js` próba userSelected + click handler w main.js) — chronione, nic nie cofnięto; committowane razem z poprawkami jako jeden zweryfikowany stan.
+| # | Problem | Rozwiązanie | Status |
+|---|---------|-------------|--------|
+| 1 | Nakładanie liter hero trwało przy -0.02em (≈6 px/literę przy --step-7 do 288px); dodatkowo GSAP `fromTo` setował inline `letterSpacing`, które nadpisywało CSS | `letter-spacing: 0em` w `.hero-title` (base.css) + usunięcie `letterSpacing` ze scrubu GSAP (typography.js) — spacing wyłącznie z arkusza, drift `yPercent` zachowany | NAPRAWIONE |
+| 2 | Klik → brak zmian | Audyt pełnego łańcucha: handler (main.js:361-368), `select()`/`userSelected` lock/`update()` (palette.js), `setPalette` obu materiałów (blob.js:34,232), tokeny `:root[data-palette]` (tokens.css:39-63), overlaye (kursor/cursor-dot/ring `pointer-events:none`, `.palette-card { pointer-events:auto }`) — **kod poprawny we wszystkich warstwach**; jedyne spójne wyjaśnienie „nic się nie zmienia” = przeglądarka użytkownika na starym bundle (HMR nie zaaplikowane). Wymagane twarde odświeżenie (Cmd+Shift+R) / ponowne otwarcie taba | ZDIAGNOZOWANE (hard refresh) |
 
 ## Decyzje, próby i blokery
-- Bug 1: -0.02em zachowuje tight display look; przy clamp do 288px nakładanie (≈13 px na literę przy -0.045em) zniesione.
-- Bug 2: semantyka wg komentarzy pliku — „deterministic default f(scene)" do pierwszego kliknięcia, potem wybór manualny jest lockiem; scroll po sekcji Palette przed kliknięciem nadal steruje paletą.
-- Bug 3: wszystkie pozycje bez widocznej utraty jakości; na mocnym sprzęcie nic się nie zmienia (DPR cap aktywny tylko przy degrade <30 fps).
-- Ocena wizualna/FPS na realnym urządzeniu = rola użytkownika (headless SwiftShader nie przenosi się).
+- Hero: 0em usuwa ryzyko nakładania przy każdym rozmiarze clamp; look display utrzymuje line-height 0.9 + krój Space Grotesk; animacja rozjazdu trackingu przy scrollu zrezygnowana (drift pionowy zostaje).
+- Klik: nie ma dowodu na błąd kodu — żadna zmiana w palette.js/main.js; zmiana hero nie mogła wpłynąć na paletę. Jeśli po hard refresh problem wróci → prosić o konsolę DevTools (błędy JS) i ekranik karta+scena, wtedy realny bug.
+- Shell net blocked (curl/ps denied) — świeżość dev-servera nieprze-testowana lokalnie; build + `docs/` odświeżone.
 
 Otwarte/blokery/stop: brak.
 
-## Wniosły
-- Build po poprawkach: JS 1419.19 KB (gzip 390.29 KB), CSS 12.01 KB, 3 woff2 lokalne; warning chunk >500KB (three.js) — znany, raport w E6/V-014.
+## Wnioski
+- Build po poprawkach: JS 1419.15 KB (gzip 390.27 KB), CSS 12.01 KB; warning chunk >500KB (three.js) — znany.
 - E7 (GitHub Pages) = następny etap główny.
 
 ## Sprawdzenia i Git
-Testy: V-020 **PASS** (build exit 0, 34 moduły, 1.36s; analiza statyczna 3 napraw: tracking CSS+GSAP spójny; palette select/update path; shadow/DPR/bloom/delta). V-013..V-014 aktualne (grep CDN: 0 hitów w src/; build OK).
-Repo/gałąź/baza/checkpoint: main; HEAD przed: ab07a85; commit poprawek: ac1b550 (drzewo czyste).
-Staged: jawnie: handoff.md, verification.md, src/main.js, src/scene/blob.js, src/scene/postprocessing.js, src/ui/palette.js, src/ui/typography.js, src/styles/base.css (bez node_modules/dane/sekrety; docs/ gitignored).
-Hash checkpointu: ab07a85 (przed poprawkami) → **ac1b550** (bugfix ×3, 8 plików, 279+/131-).
+Testy: V-021 **PASS** (build exit 0; statyczny audyt hero tracking CSS+GSAP bez kolizji; audyt łańcucha klik→paleta poprawny). V-013/V-014 aktualne (grep CDN: 0 hitów; build OK).
+Repo/gałąź/baza/checkpoint: main; HEAD przed: 98bc76c; commit rundy 2: zobacz hash poniżej (drzewo czyste).
+Staged: jawnie: handoff.md, verification.md, src/styles/base.css, src/ui/typography.js (bez node_modules/dane/sekrety; docs/ gitignored).
+Hash checkpointu: 98bc76c (przed) → NOWY (runda 2, 4 pliki).
 
 ## Wznowienie
-Następny krok: E7 — Konfiguracja GitHub Pages (R-016,R-017), ręcznie z użytkownikiem (push = osobna zgoda).
+1. Użytkownik: hard refresh (Cmd+Shift+R) i test: (a) napis „LIQUID” bez nakładania, (b) klik karty palety → akcenty UI + blob zmieniają kolor, `.is-active` wskazuje wybrana karta.
+2. Jeśli nadal błąd: DevTools Console (błędy JS) + wersja dev-servera vs `npm run dev` od nowa.
+3. E7 — Konfiguracja GitHub Pages (R-016,R-017), ręcznie z użytkownikiem (push = osobna zgoda).

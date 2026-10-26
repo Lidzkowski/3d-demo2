@@ -53,14 +53,15 @@ export function initKineticType() {
     const heroTitle = document.getElementById('hero-title');
     const heroChars = heroTitle ? split(heroTitle) : [];
 
-    // Scroll-scrubbed hero drift (runs whenever the hero scrolls out)
+    // Scroll-scrubbed hero drift (runs whenever the hero scrolls out).
+    // Note: no letterSpacing here on purpose — any inline letter-spacing from
+    // GSAP would override the stylesheet and re-introduce glyph overlap.
     if (heroTitle) {
         gsap.fromTo(
             heroTitle,
-            { yPercent: 0, letterSpacing: '-0.02em' },
+            { yPercent: 0 },
             {
                 yPercent: -18,
-                letterSpacing: '0em',
                 ease: 'none',
                 scrollTrigger: {
                     trigger: '#hero',
