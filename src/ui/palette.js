@@ -66,6 +66,8 @@ export function initUIPalette(getScene, applyBlobColors) {
         if (index < 0 || index >= PALETTES.length) return;
         userSelected = index;
         applySelection(index);
+        // diagnostic (bugfix r2): proves the click reaches the handler
+        console.info(`[Liquid] palette → ${PALETTES[index].name} (manual lock)`);
     }
 
     // Initialize current AND target at the default palette.

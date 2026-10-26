@@ -511,7 +511,7 @@ async function init() {
     animate(performance.now());
 
     // Log renderer info
-    console.info(`[Liquid] Renderer: ${useFallback ? 'WebGL (fallback)' : (isWebGPU ? 'WebGPU' : 'WebGL 2')} | Force: ${forceWebGL} | Debug: ${debugMode}`);
+    console.info(`[Liquid] Renderer: ${useFallback ? 'WebGL (fallback)' : (isWebGPU ? 'WebGPU' : 'WebGL 2')} | Force: ${forceWebGL} | Debug: ${debugMode} | Build: r2-be9c6f1`);
 }
 
 function onResize() {

@@ -1,38 +1,38 @@
 # Bieżący stan — jedyna pamięć robocza
 Projekt: SHOWCASE-LIQUID-001 | Pakiet: 1.1 | Data: 2026-10-26 | Profil: L2
-Aktualizacja: 2026-10-26 (re-test użytkownika: litery + klik kart — naprawione/ zdiagnozowane)
-Etap/podzadanie: Poprawki błędów (zadanie użytkownika): runda 2
-Status: GOTOWE
+Aktualizacja: 2026-10-26 (runda 3: instrumentacja diagnostyczna — build stamp + log kliku)
+Etap/podzadanie: Poprawki błędów (zadanie użytkownika): runda 3 (diagnoza)
+Status: ZABLOKOWANE
 Model ostatniego wykonawcy: Swift-Qwen3.8-27B-Q4_K_M (omlx)
 Następny model: Qwen3.6-35B-A3B-4bit (omlx/Qwen3.6-35B-A3B-4bit)
 Odpowiedź użytkownika: BRAK
 
 ## Cel i stan
-Użytkownik po re-teście zgłosił: (1) litery napisu głównego nadal na sobie; (2) kolory nadal nie zmieniają się po kliknięciu karty.
+Użytkownik po re-teście nadal zgłasza oba błędy; konsola czysta (tylko favicon 404, bez znaczenia). Renderer: WebGPU. Kod we wszystkich warstwach zweryfikowany statycznie jako poprawny → potrzebne dowody z runtime'u.
+Instrumentacja (temp, do usunięcia po diagnozie):
+- `src/main.js:514` — build stamp w logu startowym: `[Liquid] ... | Build: r2-be9c6f1`
+- `src/ui/palette.js select()` — `console.info('[Liquid] palette → <name> (manual lock)')`
 
-| # | Problem | Rozwiązanie | Status |
-|---|---------|-------------|--------|
-| 1 | Nakładanie liter hero trwało przy -0.02em (≈6 px/literę przy --step-7 do 288px); dodatkowo GSAP `fromTo` setował inline `letterSpacing`, które nadpisywało CSS | `letter-spacing: 0em` w `.hero-title` (base.css) + usunięcie `letterSpacing` ze scrubu GSAP (typography.js) — spacing wyłącznie z arkusza, drift `yPercent` zachowany | NAPRAWIONE |
-| 2 | Klik → brak zmian | Audyt pełnego łańcucha: handler (main.js:361-368), `select()`/`userSelected` lock/`update()` (palette.js), `setPalette` obu materiałów (blob.js:34,232), tokeny `:root[data-palette]` (tokens.css:39-63), overlaye (kursor/cursor-dot/ring `pointer-events:none`, `.palette-card { pointer-events:auto }`) — **kod poprawny we wszystkich warstwach**; jedyne spójne wyjaśnienie „nic się nie zmienia” = przeglądarka użytkownika na starym bundle (HMR nie zaaplikowane). Wymagane twarde odświeżenie (Cmd+Shift+R) / ponowne otwarcie taba | ZDIAGNOZOWANE (hard refresh) |
+Pytania do użytkownika (po reload :5174): 1) czy w konsoli jest linia z `Build: r2-be9c6f1`; 2) po kliknięciu karty palety — czy pojawia się linia `palette → …`; 3) czy napis LIQUID nadal nakłada litery.
+Rozgałęzienie: brak Build → strona/stary tab; Build tak + brak linii palette → klik nie dociera (DOM/pointer); Build+palette tak → problem wizualny (waga palety w shaderze metal 0.92 + iridescence 0.7) lub update uniform TSL.
 
 ## Decyzje, próby i blokery
-- Hero: 0em usuwa ryzyko nakładania przy każdym rozmiarze clamp; look display utrzymuje line-height 0.9 + krój Space Grotesk; animacja rozjazdu trackingu przy scrollu zrezygnowana (drift pionowy zostaje).
-- Klik: nie ma dowodu na błąd kodu — żadna zmiana w palette.js/main.js; zmiana hero nie mogła wpłynąć na paletę. Jeśli po hard refresh problem wróci → prosić o konsolę DevTools (błędy JS) i ekranik karta+scena, wtedy realny bug.
-- Shell net blocked (curl/ps denied) — świeżość dev-servera nieprze-testowana lokalnie; build + `docs/` odświeżone.
+- R2 (be9c6f1): hero `letter-spacing: 0em` CSS-only + usunięcie inline letterSpacing GSAP; audyt łańcucha kliku (handler main.js:361, lock/update palette.js, setPalette blob.js:34,232, tokens.css, pointer-events) — kod poprawny.
+- R3: zero zmian funkcjonalnych — tylko 2× console.info.
 
-Otwarte/blokery/stop: brak.
+Otwarte/blokery/stop: czekam na konsolę użytkownika po reload.
 
 ## Wnioski
-- Build po poprawkach: JS 1419.15 KB (gzip 390.27 KB), CSS 12.01 KB; warning chunk >500KB (three.js) — znany.
-- E7 (GitHub Pages) = następny etap główny.
+- Build r3: OK (JS ~1419 KB, warning chunk >500KB znany).
+- Po diagnozie: usunąć logi diagnostyczne; ew. boost wagi palety w shaderze (decyzja osobna, zachować quality).
 
 ## Sprawdzenia i Git
-Testy: V-021 **PASS** (build exit 0; statyczny audyt hero tracking CSS+GSAP bez kolizji; audyt łańcucha klik→paleta poprawny). V-013/V-014 aktualne (grep CDN: 0 hitów; build OK).
-Repo/gałąź/baza/checkpoint: main; HEAD przed: 98bc76c; commit rundy 2: **be9c6f1** (drzewo czyste).
-Staged: jawnie: handoff.md, verification.md, src/styles/base.css, src/ui/typography.js (bez node_modules/dane/sekrety; docs/ gitignored).
-Hash checkpointu: 98bc76c (przed) → **be9c6f1** (runda 2, 4 pliki, 26+/26-).
+Testy: build exit 0. V-013/V-014 aktualne.
+Repo/gałąź/checkpoint: main; HEAD przed: 87a7073; commit r3: zobacz hash poniżej (drzewo czyste).
+Staged: jawnie: src/main.js, src/ui/palette.js, handoff.md (bez node_modules/sekretów; docs/ gitignored).
+Hash checkpointu: 87a7073 (przed) → NOWY (r3).
 
 ## Wznowienie
-1. Użytkownik: hard refresh (Cmd+Shift+R) i test: (a) napis „LIQUID” bez nakładania, (b) klik karty palety → akcenty UI + blob zmieniają kolor, `.is-active` wskazuje wybrana karta.
-2. Jeśli nadal błąd: DevTools Console (błędy JS) + wersja dev-servera vs `npm run dev` od nowa.
-3. E7 — Konfiguracja GitHub Pages (R-016,R-017), ręcznie z użytkownikiem (push = osobna zgoda).
+1. Użytkownik reloaduje (:5174) i wysyła konsolę wg pytań wyżej.
+2. Wg wyniku: (a) stary bundle → wyjaśnić źródło strony; (b) klik nie dociera → audyt DOM/pointer (computed pointer-events, overlaye); (c) klik dociera → test uniform TSL WebGPU + waga palety w blob.js.
+3. E7 = następny etap główny.
