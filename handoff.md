@@ -30,7 +30,7 @@ Otwarte/blokery/stop: czekam na konsolę użytkownika po reload.
 Testy: build exit 0. V-013/V-014 aktualne.
 Repo/gałąź/checkpoint: main; HEAD przed: 87a7073; commit r3: zobacz hash poniżej (drzewo czyste).
 Staged: jawnie: src/main.js, src/ui/palette.js, handoff.md (bez node_modules/sekretów; docs/ gitignored).
-Hash checkpointu: 87a7073 (przed) → NOWY (r3).
+Hash checkpointu: 87a7073 (przed) → **b98702b** (r3).
 
 ## Wznowienie
 1. Użytkownik reloaduje (:5174) i wysyła konsolę wg pytań wyżej.
