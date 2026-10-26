@@ -2,7 +2,7 @@
 Projekt: SHOWCASE-LIQUID-001 | Pakiet: 1.1 | Data: 2026-10-26 | Profil: L2
 Aktualizacja: 2026-10-26 (naprawa 3 błędów zgłoszonych przez użytkownika — ZAKOŃCZONE)
 Etap/podzadanie: Poprawki błędów (zadanie użytkownika): 1→2→3 wykonane
-Status: W TOKU
+Status: GOTOWE
 Model ostatniego wykonawcy: Qwen3.6-35B-A3B-4bit (omlx)
 Następny model: Qwen3.6-35B-A3B-4bit (omlx/Qwen3.6-35B-A3B-4bit)
 Odpowiedź użytkownika: BRAK
@@ -32,9 +32,9 @@ Otwarte/blokery/stop: brak.
 
 ## Sprawdzenia i Git
 Testy: V-020 **PASS** (build exit 0, 34 moduły, 1.36s; analiza statyczna 3 napraw: tracking CSS+GSAP spójny; palette select/update path; shadow/DPR/bloom/delta). V-013..V-014 aktualne (grep CDN: 0 hitów w src/; build OK).
-Repo/gałąź/baza/checkpoint: main; HEAD przed: ab07a85; commit poprawek: DO DOPISANIA.
+Repo/gałąź/baza/checkpoint: main; HEAD przed: ab07a85; commit poprawek: ac1b550 (drzewo czyste).
 Staged: jawnie: handoff.md, verification.md, src/main.js, src/scene/blob.js, src/scene/postprocessing.js, src/ui/palette.js, src/ui/typography.js, src/styles/base.css (bez node_modules/dane/sekrety; docs/ gitignored).
-Hash checkpointu: ab07a85 (przed poprawkami) → commit bugfix: DO DOPISANIA.
+Hash checkpointu: ab07a85 (przed poprawkami) → **ac1b550** (bugfix ×3, 8 plików, 279+/131-).
 
 ## Wznowienie
 Następny krok: E7 — Konfiguracja GitHub Pages (R-016,R-017), ręcznie z użytkownikiem (push = osobna zgoda).
