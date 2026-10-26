@@ -57,10 +57,10 @@ export function initKineticType() {
     if (heroTitle) {
         gsap.fromTo(
             heroTitle,
-            { yPercent: 0, letterSpacing: '-0.045em' },
+            { yPercent: 0, letterSpacing: '-0.02em' },
             {
                 yPercent: -18,
-                letterSpacing: '-0.01em',
+                letterSpacing: '0em',
                 ease: 'none',
                 scrollTrigger: {
                     trigger: '#hero',

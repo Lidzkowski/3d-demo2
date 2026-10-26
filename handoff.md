@@ -1,56 +1,40 @@
 # Bieżący stan — jedyna pamięć robocza
-Projekt: SHOWCASE-LIQUID-001 | Pakiet: 1.1 | Data: 2026-10-25 | Profil: L2
-Aktualizacja: 2026-10-25 (E6: 735385a + ddd2550 handoff update → V-013..V-014 PASS, V-015 NIE WYKONANO)
-Etap/podzadanie: E6 — Pomiary, przegląd, README (R-013,R-014,R-015) — ZAKOŃCZONE
-Status: GOTOWE
+Projekt: SHOWCASE-LIQUID-001 | Pakiet: 1.1 | Data: 2026-10-26 | Profil: L2
+Aktualizacja: 2026-10-26 (naprawa 3 błędów zgłoszonych przez użytkownika — ZAKOŃCZONE)
+Etap/podzadanie: Poprawki błędów (zadanie użytkownika): 1→2→3 wykonane
+Status: W TOKU
 Model ostatniego wykonawcy: Qwen3.6-35B-A3B-4bit (omlx)
 Następny model: Qwen3.6-35B-A3B-4bit (omlx/Qwen3.6-35B-A3B-4bit)
 Odpowiedź użytkownika: BRAK
 
 ## Cel i stan
-Cel E5b (z karty): jakość adaptacyjna (DPR, liczba cząstek wg FPS), pauza renderu poza widokiem/ukrytą kartą, dźwięki UI proceduralne (Web Audio, gest, przełącznik), prefers-reduced-motion, noscript, wariant mobilny.
+Zadanie użytkownika — 3 błądy naprawione po kolei:
 
-Wykonano (commit 43fad49, 10 plików, 572 lines+):
-- `src/ui/adaptive-quality.js` (nowy): `reducedMotion`, `isMobile`, `getAdaptiveDpr` (1.5 low, 2 high), FPS monitor (2 s okno, prog 30/45 fps), `createVisibilityGuard` (IntersectionObserver + visibilitychange), `recordFrame`, `getCurrentFps`, `getQualityTarget`
-- `src/ui/sounds.js` (nowy): Web Audio procedural — `initAudio` (click/touchstart/keydown, once), `playClick` (sine 880→440 Hz 0.1s), `playHover` (sine 1200 Hz 0.06s, throttled 300ms), `playScroll` (triangle 180→120 Hz, 0.25s throttled 500ms), `toggleMute`/`setMute`, `masterGain 0.12`
-- `src/ui/accessibility.js` (nowy): `prefers-reduced-motion` query + change listener, `keyboard-focus` klasa, `noscript` content
-- `src/main.js` (zmiany): import new modules, `visibilityGuard` + `shouldRender`, `mobileMode` flag, `getAdaptiveDpr` DPR, particles 250 na mobile, PP disabled na mobile, FPS/adaptive degrade w animate() (5s throttle), sound gesture (once: click/touchstart/keydown), sound toggle button handler, hover/click/scroll sound triggers, debug overlay rozszerzony (Mobile/Motion)
-- `src/styles/base.css` (zmiany): .sound-toggle (fixed pos, SVG icons, is-mute toggle), .reduced-motion (animation none, opacity forced), .keyboard-focus, .mobile-mode
-- `src/ui/cursor.js` (zmiany): reducedMotion guard — skip custom cursor
-- `src/ui/typography.js` (zmiany): reducedMotion guard — skip GSAP animations
-- `index.html` (zmiany): sound-toggle button (SVG mute/on), noscript fallback content
-- `verification.md` (zmiany): V-009..V-012 PASS (statyczna analiza kodu)
-- `handoff.md` (zmiany): E5b status → GOTOWE
+| # | Błąd | Pliki zmienione | Naprawa | Status |
+|---|------|-----------------|---------|--------|
+| 1 | Główny napis — litery nachodziły na siebie | `src/styles/base.css`, `src/ui/typography.js` | tracking hero -0.045em → -0.02em (CSS + GSAP scrub spójne: -0.02em → 0em) | NAPRAWIONE |
+| 2 | Kolor zmieniał się tylko raz; klik karty nie działał (scena nadpisywała) | `src/ui/palette.js` | osobny `applySelection()` (wybór sceniczny, bez side-effects) vs `select()` (klik karty → `userSelected` lock); w `update()`: manualLocked wygrywa wszędzie (incl. scena Palette); poza sceną trzyma `sceneTarget`; kolejne kliki działają i się utrzymują | NAPRAWIONE |
+| 3 | Wydajność animacji i sceny (płynnie na słabym sprzęcie, bez utraty jakości) | `src/main.js`, `src/scene/postprocessing.js` | (a) keyLight.castShadow usunięte — brak odbiorników cieni w scenie = zero zmiany wizualnej, oszczędność całego shadow pass/klatkę; (b) adaptacyjny pixelRatio `applyRendererDpr()`: low→min(dpr,1.5), high→min(dpr,2), sync `uPixelRatio` cząstek + `composer.setSize`; (c) bloom UnrealBloomPass w połowie rozdzielczości (override setSize ×0.5, RT bazowe pełne) — glow niedostrzegalnie ten sam, ~4x tańsze rozmycie; (d) `timer.getDelta()` raz na klatkę | NAPRAWIONE |
 
-### E6 — Pomiary i dokumentacja (735385a)
-- `verification.md`: V-013 PASS, V-014 PASS, V-015 NIE WYKONANO
-- `handoff.md`: E6 status, wyniki, Git checkpoint
+⚠️ Commit zawiera **również wcześniejsze niezcommittowane zmiany użytkownika** (`src/main.js` oświetlenie studio, `src/scene/blob.js` tuning materiałów, `src/scene/postprocessing.js` wartości bloom, `src/ui/palette.js` próba userSelected + click handler w main.js) — chronione, nic nie cofnięto; committowane razem z poprawkami jako jeden zweryfikowany stan.
 
 ## Decyzje, próby i blokery
-- Dźwięk: proceduralny, Web Audio API, bez plików/mikrofonu. Domyślnie muted. Gest (click/touchstart/keydown, once) inicjuje AudioContext. Toggle button zmienia muted/masterGain.
-- Jakość adaptacyjna: 2 s FPS window, threshold 30 fps → low, 45 fps → high. Throttle 5 s między zmianami.
-- Mobile: `(pointer: coarse)` || `innerWidth < 768` → 250 cząstek, brak PP, DPR cap 1.5.
-- Reduced motion: `.reduced-motion` na `<html>`; CSS disable animations; JS skip GSAP/kursor; noscript fallback.
-- Pause: IntersectionObserver na canvas (threshold 0.01) + `document.hidden`; early return w animate().
+- Bug 1: -0.02em zachowuje tight display look; przy clamp do 288px nakładanie (≈13 px na literę przy -0.045em) zniesione.
+- Bug 2: semantyka wg komentarzy pliku — „deterministic default f(scene)" do pierwszego kliknięcia, potem wybór manualny jest lockiem; scroll po sekcji Palette przed kliknięciem nadal steruje paletą.
+- Bug 3: wszystkie pozycje bez widocznej utraty jakości; na mocnym sprzęcie nic się nie zmienia (DPR cap aktywny tylko przy degrade <30 fps).
+- Ocena wizualna/FPS na realnym urządzeniu = rola użytkownika (headless SwiftShader nie przenosi się).
 
 Otwarte/blokery/stop: brak.
 
 ## Wniosły
-- Build: 1416.87 KB JS / 389.53 KB gzip / 12.01 KB CSS (3 woff2 lokalne)
-
-## E6 — Wyniki
-- Build: `npm run build` exit 0, 34 moduły, 1.40s
-- Rozmiary: JS 1416.87 KB (gzip 389.53 KB), CSS 12.01 KB (gzip 3.25 KB), 3 woff2 (47.94 KB), index.html 7.25 KB (gzip 2.37 KB); total ~1.48 MB
-- Warning: chunk >500KB (three.js)
-- V-013: PASS (grep src/ = 0 hitów; index.html linia 147 = noscript fallback; vite.config.js czysty)
-- V-014: PASS (raport rozmiarów; FPS z ?debug — dev server działa, shell net blocked)
-- V-015: NIE WYKONANO (lighthouse command not found)
+- Build po poprawkach: JS 1419.19 KB (gzip 390.29 KB), CSS 12.01 KB, 3 woff2 lokalne; warning chunk >500KB (three.js) — znany, raport w E6/V-014.
+- E7 (GitHub Pages) = następny etap główny.
 
 ## Sprawdzenia i Git
-Testy: V-009 **PASS** (FPS monitor 2s, thresholds 30/45, adaptive degrade 5s throttle, DPR capping 1.5/2, IntersectionObserver + visibilitychange, early return); V-010 **PASS** (Web Audio procedural: sine/triangle, gesture once, toggleMute, masterGain, SVG mute/on, no files); V-011 **PASS** (prefers-reduced-motion query+change, CSS animations none, noscript content, keyboard-focus class, cursor/typography guards); V-012 **PASS** (pointer:coarse||width<768, 250 particles, no PP, DPR cap 1.5, .mobile-mode CSS); V-013 **PASS** (grep src/ = 0 zewnętrznych URL; index.html:147 noscript fallback linki; vite.config.js czysty — brak proxy/CDN; public/ tylko .nojekyll); V-014 **PASS** (npm run build exit 0, JS 1416.87 KB/gzip 389.53 KB, CSS 12.01 KB/gzip 3.25 KB, 3 woff2 lokalne, build warning chunk >500KB); V-015 **NIE WYKONANO** (lighthouse command not found)
-Repo/gałąź/baza/checkpoint: main; HEAD = 735385a; robocze drzewo czyste.
-Staged/unstaged/untracked: puste.
-Hash checkpointu: 735385a (E6 main); ddd2550 (handoff update)
+Testy: V-020 **PASS** (build exit 0, 34 moduły, 1.36s; analiza statyczna 3 napraw: tracking CSS+GSAP spójny; palette select/update path; shadow/DPR/bloom/delta). V-013..V-014 aktualne (grep CDN: 0 hitów w src/; build OK).
+Repo/gałąź/baza/checkpoint: main; HEAD przed: ab07a85; commit poprawek: DO DOPISANIA.
+Staged: jawnie: handoff.md, verification.md, src/main.js, src/scene/blob.js, src/scene/postprocessing.js, src/ui/palette.js, src/ui/typography.js, src/styles/base.css (bez node_modules/dane/sekrety; docs/ gitignored).
+Hash checkpointu: ab07a85 (przed poprawkami) → commit bugfix: DO DOPISANIA.
 
 ## Wznowienie
-Następny krok: E7 — Konfiguracja GitHub Pages (R-016,R-017)
+Następny krok: E7 — Konfiguracja GitHub Pages (R-016,R-017), ręcznie z użytkownikiem (push = osobna zgoda).

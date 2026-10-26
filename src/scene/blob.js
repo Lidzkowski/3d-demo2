@@ -46,7 +46,7 @@ const {
     float, vec3, uniform,
     mx_fractal_noise_float,
     positionLocal, normalLocal,
-    normalize, max, pow, mix, smoothstep, sin, dot,
+    normalize, max, pow, mix, smoothstep, sin, cos, dot, abs, exp,
     cameraPosition, modelViewPosition, normalView,
 } = TSL;
 
@@ -58,20 +58,32 @@ export function createBlobMaterial(quality = 'high') {
     const isLow = quality === 'low';
 
     // ─── Displacement: multi-octave TSL fractal noise ───
+    // Smoother, more organic displacement
     const pos = positionLocal;
     const time = TSL.time;
 
+    // Primary wave — slow, large undulations
     const noise1 = mx_fractal_noise_float(
-        pos.mul(float(0.8)).add(time.mul(float(0.25))),
-        float(4), float(2.0), float(0.5)
+        pos.mul(float(0.6)).add(time.mul(float(0.15))),
+        float(5), float(2.2), float(0.5)
     );
 
-    const detailNoise = mx_fractal_noise_float(
-        pos.mul(float(2.0)).add(time.mul(float(0.4))),
-        float(2), float(2.0), float(0.5)
+    // Secondary detail — finer, faster movement
+    const noise2 = mx_fractal_noise_float(
+        pos.mul(float(1.5)).add(time.mul(float(0.3))),
+        float(3), float(2.0), float(0.5)
     );
 
-    const displacement = noise1.mul(float(0.35)).add(detailNoise.mul(float(0.08)));
+    // Surface micro-detail — subtle texture
+    const microNoise = mx_fractal_noise_float(
+        pos.mul(float(3.5)).add(time.mul(float(0.1))),
+        float(2), float(1.8), float(0.5)
+    );
+
+    // Combined displacement — smoother, more organic
+    const displacement = noise1.mul(float(0.22)).add(
+        noise2.mul(float(0.08)).add(microNoise.mul(float(0.03)))
+    );
 
     // Position node: base + normal * displacement (TSL, no GLSL)
     material.positionNode = pos.add(normalLocal.normalize().mul(displacement));
@@ -88,8 +100,8 @@ export function createBlobMaterial(quality = 'high') {
         // Use positionLocal (base vertex, no displacement) to avoid
         // circular dependency: modelViewPosition depends on positionNode.
         const baseVert = pos;
-        const mouseInfluence = float(1.5);
-        const mouseFalloff = float(0.6);
+        const mouseInfluence = float(1.2);
+        const mouseFalloff = float(0.5);
         // Project mouse to 3D at vertex depth using base vertex
         const mvBase = cameraPosition.add(cameraPosition.z.mul(vec3(mousePos.x, mousePos.y, float(1.0))));
         const vertView = cameraPosition.add(cameraPosition.z.mul(vec3(baseVert.x, baseVert.y, float(1.0))));
@@ -102,7 +114,7 @@ export function createBlobMaterial(quality = 'high') {
             mouseUniform.impulse = { value: 0 };
         }
         const impulseVal = mouseUniform.impulse.value;
-        const impulseWave = sin(mouseDist.sub(impulseVal.mul(float(3.0)))).mul(impulseVal).mul(float(0.5));
+        const impulseWave = sin(mouseDist.sub(impulseVal.mul(float(3.0)))).mul(impulseVal).mul(float(0.4));
 
         // Add mouse + impulse to base positionNode (don't replace)
         material.positionNode = material.positionNode.add(normalLocal.normalize().mul(mouseDisp.add(impulseWave)));
@@ -112,7 +124,7 @@ export function createBlobMaterial(quality = 'high') {
     // Three uniform stops (interior → mid → peaks), initialized to the
     // E2 gradient. initUIPalette() eases them via setPalette() while the
     // Palette scene is active.
-    const t = displacement.mul(float(1.5)).add(float(0.5));
+    const t = displacement.mul(float(2.0)).add(float(0.5));
     const _paletteColor = new THREE.Color();
     const paletteStops = [0x080214, 0x0d4f6e, 0x2d1b69].map((hex) => {
         _paletteColor.setHex(hex);
@@ -148,9 +160,9 @@ export function createBlobMaterial(quality = 'high') {
 
     // Iridescence for oil-slick rainbow shift
     if (!isLow) {
-        material.iridescenceNode = float(0.6);
-        material.iridescenceIORNode = float(1.3);
-        material.iridescenceThicknessNode = float(0.3);
+        material.iridescenceNode = float(0.7);
+        material.iridescenceIORNode = float(1.4);
+        material.iridescenceThicknessNode = float(0.4);
     } else {
         material.iridescenceNode = float(0.0);
         material.iridescenceIORNode = float(1.0);
@@ -159,8 +171,8 @@ export function createBlobMaterial(quality = 'high') {
 
     // Sheen for fabric-like edge glow (subtle purple sheen)
     if (!isLow) {
-        material.sheenNode = vec3(float(0.15), float(0.05), float(0.25));
-        material.sheenRoughnessNode = float(0.4);
+        material.sheenNode = vec3(float(0.2), float(0.08), float(0.35));
+        material.sheenRoughnessNode = float(0.3);
     } else {
         material.sheenNode = vec3(float(0.0));
         material.sheenRoughnessNode = float(1.0);
@@ -168,24 +180,31 @@ export function createBlobMaterial(quality = 'high') {
 
     // Dispersion for prism-like rainbow splitting (high quality only)
     if (!isLow) {
-        material.dispersionNode = float(0.08);
+        material.dispersionNode = float(0.1);
     } else {
         material.dispersionNode = float(0.0);
     }
 
     // ─── Fresnel rim glow (TSL, no GLSL) ───
-    // Increased power (4.0) for sharper, brighter rim
+    // Stronger, wider rim with color variation
     const viewDir = normalize(cameraPosition.sub(modelViewPosition).xyz).toVar();
-    const fresnel = pow(float(1.0).sub(max(float(0.0), dot(normalView, viewDir))), float(4.0));
+    const fresnel = pow(float(1.0).sub(max(float(0.0), dot(normalView, viewDir))), float(3.5));
 
-    // ─── Iridescence from displacement ───
-    const iridPhase = sin(displacement.mul(float(8.0)).add(time.mul(float(0.5)))).mul(float(0.5)).add(float(0.5));
-    const iridColor = vec3(float(0.1), float(0.05), float(0.15)).mul(iridPhase);
+    // ─── Internal subsurface-like glow ──────────────────────
+    // Simulates light passing through translucent material
+    // Uses a combination of fresnel and noise for depth
+    const glowIntensity = pow(fresnel, float(1.5)).mul(float(0.6));
+    const glowColor = mix(paletteStops[1], vec3(float(1.0), float(1.0), float(1.0)), float(0.3));
+    const internalGlow = glowColor.mul(glowIntensity);
+
+    // ─── Iridescence from displacement ──────────────────────
+    const iridPhase = sin(displacement.mul(float(10.0)).add(time.mul(float(0.4)))).mul(float(0.5)).add(float(0.5));
+    const iridColor = vec3(float(0.15), float(0.08), float(0.25)).mul(iridPhase);
 
     // ─── Emissive: glass-metal hybrid with fresnel rim + iridescence ───
-    // Brighter rim (0.8 instead of 0.6), darker interior
-    const glassColor = mix(finalColor, vec3(float(1.0)), fresnel.mul(float(0.8)));
-    const emissiveColor = glassColor.add(iridColor.mul(fresnel));
+    // Brighter rim (0.9), internal glow, iridescence at edges
+    const glassColor = mix(finalColor, vec3(float(1.0)), fresnel.mul(float(0.9)));
+    const emissiveColor = glassColor.add(iridColor.mul(fresnel)).add(internalGlow);
 
     material.emissiveNode = emissiveColor;
 
@@ -196,12 +215,12 @@ export function createBlobMaterial(quality = 'high') {
     material.ior = 1.52;
     material.clearcoat = 0.8;
     material.clearcoatRoughness = 0.05;
-    material.iridescence = isLow ? 0.0 : 0.6;
-    material.iridescenceIOR = 1.3;
-    material.iridescenceThickness = isLow ? 0.0 : 0.3;
-    material.sheen = isLow ? 0.0 : 0.15;
-    material.sheenRoughness = isLow ? 1.0 : 0.4;
-    material.dispersion = isLow ? 0.0 : 0.08;
+    material.iridescence = isLow ? 0.0 : 0.7;
+    material.iridescenceIOR = 1.4;
+    material.iridescenceThickness = isLow ? 0.0 : 0.4;
+    material.sheen = isLow ? 0.0 : 0.2;
+    material.sheenRoughness = isLow ? 1.0 : 0.3;
+    material.dispersion = isLow ? 0.0 : 0.1;
     material.attenuationDistance = isLow ? 0.0 : 3.0;
     material.attenuationColor = isLow ? new THREE.Color(1.0) : new THREE.Color(0.6, 0.8, 1.0);
     material.transparent = true;
@@ -234,40 +253,87 @@ export function createBlobMaterial(quality = 'high') {
 }
 
 // ─── Geometry: high-poly icosahedron ─────────────────────────
-export function createBlobGeometry(detail = 64) {
+export function createBlobGeometry(detail = 4) {
     return new THREE.IcosahedronGeometry(1.8, detail);
 }
 
 // ─── Procedural environment: equirectangular canvas → PMREM cubemap ──
-// Bright colored panels for glass-metal reflections
+// Enhanced with gradients and soft light panels for richer reflections
 export function createProceduralEnvironment(renderer) {
     const canvas = document.createElement('canvas');
     canvas.width = 2048;
     canvas.height = 1024;
     const ctx = canvas.getContext('2d');
 
-    // Dark background
-    ctx.fillStyle = '#050510';
+    // Deep dark gradient background
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    bgGrad.addColorStop(0, '#08081a');
+    bgGrad.addColorStop(0.5, '#050512');
+    bgGrad.addColorStop(1, '#030310');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Bright colored panels for sharp reflections (simulating studio lights)
-    // Top-left bright blue panel
-    ctx.fillStyle = '#3366ff';
-    ctx.fillRect(0, 0, canvas.width * 0.25, canvas.height * 0.3);
-    // Top-right warm pink panel
-    ctx.fillStyle = '#ff4488';
-    ctx.fillRect(canvas.width * 0.75, 0, canvas.width * 0.25, canvas.height * 0.3);
-    // Center bright white strip
-    ctx.fillStyle = '#ffffff';
-    ctx.globalAlpha = 0.3;
-    ctx.fillRect(canvas.width * 0.4, 0, canvas.width * 0.2, canvas.height * 0.15);
-    ctx.globalAlpha = 1.0;
-    // Bottom green accent
-    ctx.fillStyle = '#44ff88';
-    ctx.fillRect(canvas.width * 0.3, canvas.height * 0.7, canvas.width * 0.15, canvas.height * 0.3);
-    // Bottom purple accent
-    ctx.fillStyle = '#aa44ff';
-    ctx.fillRect(canvas.width * 0.6, canvas.height * 0.7, canvas.width * 0.15, canvas.height * 0.3);
+    // Soft gradient panels for smooth reflections (studio lighting)
+    function addGradientPanel(x, y, w, h, color1, color2, angle = 0) {
+        ctx.save();
+        ctx.translate(x + w / 2, y + h / 2);
+        ctx.rotate(angle);
+        const grad = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+        grad.addColorStop(0, color1);
+        grad.addColorStop(1, color2);
+        ctx.fillStyle = grad;
+        ctx.fillRect(-w / 2, -h / 2, w, h);
+        ctx.restore();
+    }
+
+    // Top-left cool blue panel (large, soft)
+    addGradientPanel(0, 0, canvas.width * 0.3, canvas.height * 0.35,
+        'rgba(30, 60, 180, 0.6)', 'rgba(10, 20, 60, 0.1)', 0.3);
+
+    // Top-right warm pink/rose panel
+    addGradientPanel(canvas.width * 0.65, 0, canvas.width * 0.35, canvas.height * 0.35,
+        'rgba(200, 50, 120, 0.5)', 'rgba(80, 10, 50, 0.1)', -0.2);
+
+    // Center bright key light (narrow, intense)
+    addGradientPanel(canvas.width * 0.38, 0, canvas.width * 0.24, canvas.height * 0.12,
+        'rgba(255, 255, 255, 0.5)', 'rgba(200, 220, 255, 0.2)', 0);
+
+    // Upper center warm highlight
+    addGradientPanel(canvas.width * 0.35, canvas.height * 0.05, canvas.width * 0.15, canvas.height * 0.08,
+        'rgba(255, 200, 150, 0.4)', 'rgba(255, 150, 100, 0.1)', 0.1);
+
+    // Bottom-left cyan/green accent
+    addGradientPanel(canvas.width * 0.2, canvas.height * 0.65, canvas.width * 0.25, canvas.height * 0.35,
+        'rgba(30, 180, 140, 0.35)', 'rgba(10, 80, 70, 0.1)', -0.4);
+
+    // Bottom-right purple/violet accent
+    addGradientPanel(canvas.width * 0.55, canvas.height * 0.65, canvas.width * 0.3, canvas.height * 0.35,
+        'rgba(120, 40, 200, 0.4)', 'rgba(40, 10, 80, 0.1)', 0.3);
+
+    // Bottom edge subtle warm fill
+    addGradientPanel(canvas.width * 0.1, canvas.height * 0.9, canvas.width * 0.8, canvas.height * 0.1,
+        'rgba(180, 100, 60, 0.2)', 'rgba(100, 50, 30, 0.05)', 0);
+
+    // Side fill lights (narrow vertical strips)
+    addGradientPanel(canvas.width * 0.02, canvas.height * 0.3, canvas.width * 0.06, canvas.height * 0.4,
+        'rgba(40, 80, 160, 0.3)', 'rgba(20, 40, 100, 0.05)', 0.5);
+
+    addGradientPanel(canvas.width * 0.92, canvas.height * 0.3, canvas.width * 0.06, canvas.height * 0.4,
+        'rgba(160, 40, 100, 0.3)', 'rgba(80, 20, 60, 0.05)', -0.5);
+
+    // Small bright specular highlights
+    function addSpecular(x, y, radius, color) {
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        grad.addColorStop(0, color);
+        grad.addColorStop(0.3, color.replace(/[0-9.]+\)$/, '0.3)'));
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+    }
+
+    addSpecular(canvas.width * 0.5, canvas.height * 0.08, 80, 'rgba(255, 255, 255, 0.7)');
+    addSpecular(canvas.width * 0.15, canvas.height * 0.15, 50, 'rgba(100, 150, 255, 0.4)');
+    addSpecular(canvas.width * 0.85, canvas.height * 0.15, 50, 'rgba(255, 100, 150, 0.4)');
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.mapping = THREE.EquirectangularReflectionMapping;

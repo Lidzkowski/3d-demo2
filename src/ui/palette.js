@@ -2,8 +2,11 @@
 // Three palettes switched inside the Palette scene (scene index 3).
 // Owns the UI accent colors (CSS custom properties) and the blob
 // color stops (scene material palette interface — see blob.js setPalette).
-// Deterministic: palette = f(current scene). Outside the Palette scene
-// the interface rests on the default palette.
+//
+// Deterministic default: palette = f(current scene) until the user clicks.
+// Manual override: clicking a palette card locks that choice everywhere
+// (including on the Palette scene). Subsequent card clicks keep working —
+// the locked choice simply follows the newest click.
 
 import * as THREE from 'three';
 
@@ -34,13 +37,17 @@ const _current = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
 
 export function initUIPalette(getScene, applyBlobColors) {
     let active = 0;
+    let userSelected = null; // null = scene-driven; >= 0 = manual pick (locked)
+    let sceneTarget = 0;     // last scene-driven target (persisted off-scene)
 
     function setStop(v, hex) {
         _color.setHex(hex);
         v.set(_color.r, _color.g, _color.b);
     }
 
-    function select(index) {
+    // Apply a palette (no ownership/lock side effects).
+    // Safe to call repeatedly — early-returns when unchanged.
+    function applySelection(index) {
         if (index === active || index < 0 || index >= PALETTES.length) return;
         active = index;
         const palette = PALETTES[index];
@@ -53,9 +60,15 @@ export function initUIPalette(getScene, applyBlobColors) {
         });
     }
 
+    // Manual pick (palette card click) — locks the choice everywhere,
+    // including on the Palette scene where scroll progress would drive it.
+    function select(index) {
+        if (index < 0 || index >= PALETTES.length) return;
+        userSelected = index;
+        applySelection(index);
+    }
+
     // Initialize current AND target at the default palette.
-    // (select() early-returns when the index is unchanged, so it must
-    // not be the only thing initializing _target.)
     for (let i = 0; i < 3; i++) {
         setStop(_current[i], PALETTES[0].blob[i]);
         setStop(_target[i], PALETTES[0].blob[i]);
@@ -65,16 +78,26 @@ export function initUIPalette(getScene, applyBlobColors) {
         el.classList.toggle('is-active', Number(el.dataset.paletteCard) === 0);
     });
 
-    // Call once per frame (dt in seconds): re-derive target from the scene,
-    // ease the blob stops toward it, apply while moving.
+    // Call once per frame (dt in seconds): derive the target, ease the blob
+    // stops toward it, apply while moving.
     function update(dt) {
         const scene = getScene();
-        let target = 0;
-        if (scene && scene.sceneIndex === PALETTE_SCENE_INDEX) {
+        let target;
+
+        if (userSelected !== null) {
+            // Manual choice wins everywhere (locked by a card click)
+            target = userSelected;
+        } else if (scene && scene.sceneIndex === PALETTE_SCENE_INDEX) {
+            // On palette scene, no manual pick yet: drive by scene progress
             const p = Math.min(1, Math.max(0, scene.sceneProgress ?? 0));
             target = Math.min(PALETTES.length - 1, Math.floor(p * PALETTES.length));
+        } else {
+            // Off-palette scene: persist the last scene-driven palette
+            target = sceneTarget;
         }
-        select(target);
+        sceneTarget = target;
+
+        applySelection(target);
 
         // Exponential ease of the blob stops toward the target
         const k = 1 - Math.exp(-dt * 4);
@@ -92,6 +115,5 @@ export function initUIPalette(getScene, applyBlobColors) {
         }
     }
 
-    select(0);
     return { update, select };
 }

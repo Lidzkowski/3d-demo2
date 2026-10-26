@@ -73,6 +73,9 @@ function toggleQuality() {
         postProcessing.setQuality(currentQuality);
     }
 
+    // Bugfix(perf): render resolution follows the quality level
+    applyRendererDpr();
+
     // Update blob material quality
     if (mesh) {
         // For TSL material, we can't easily change quality mid-flight,
@@ -96,6 +99,30 @@ window.addEventListener('keydown', (e) => {
 
 // Expose for testing / console access
 window.toggleLiquidQuality = toggleQuality;
+
+// ─── Adaptive pixel ratio (perf) ──────────────────────────
+// On weaker devices the FPS monitor degrades quality to 'low'; at that
+// point also drop render resolution (min(devicePixelRatio, 1.5)).
+// Restored to min(devicePixelRatio, 2) when quality goes back to 'high'.
+// Capable devices keep the original resolution — no quality loss.
+let currentDprCap = null;
+function applyRendererDpr() {
+    if (!renderer) return;
+    const cap = mobileMode ? 1.5 : (currentQuality === 'high' ? 2 : 1.5);
+    const dpr = Math.min(window.devicePixelRatio, cap);
+    if (dpr === currentDprCap) return;
+    currentDprCap = dpr;
+    renderer.setPixelRatio(dpr);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    // The composer captured the pixel ratio at construction — rebuild RTs
+    if (postProcessing) {
+        postProcessing.setSize(window.innerWidth, window.innerHeight);
+    }
+    // Particle point-size attenuation must follow the renderer DPR
+    if (particles && particles.uniforms.uPixelRatio) {
+        particles.uniforms.uPixelRatio.value = dpr;
+    }
+}
 
 // ─── E5b: Sound gesture & toggle ──────────────────────────────
 let soundGestureHandled = false;
@@ -237,21 +264,43 @@ async function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color('#0a0a0a');
 
-    // Subtle lights for TSL material interaction
-    const ambientLight = new THREE.AmbientLight(0x404060, 0.5);
+    // ─── Studio-style lighting ────────────────────────────────
+    // Soft ambient fill
+    const ambientLight = new THREE.AmbientLight(0x303050, 0.4);
     scene.add(ambientLight);
 
-    const pointLight1 = new THREE.PointLight(0x4488ff, 2, 15);
-    pointLight1.position.set(3, 2, 3);
-    scene.add(pointLight1);
+    // Key light — warm white, from upper-right.
+    // Bugfix(perf): no shadow casting — the scene has no shadow receivers
+    // (no floor; glass blob + additive points), so the shadow map pass
+    // cost a full extra render every frame for zero visible change.
+    const keyLight = new THREE.DirectionalLight(0xfff0e0, 1.8);
+    keyLight.position.set(4, 5, 3);
+    scene.add(keyLight);
 
-    const pointLight2 = new THREE.PointLight(0xff4488, 1.5, 15);
-    scene.add(pointLight2);
-    pointLight2.position.set(-3, -1, 2);
+    // Fill light — cool blue, from left, softer
+    const fillLight = new THREE.DirectionalLight(0x8888cc, 0.6);
+    fillLight.position.set(-4, 2, 1);
+    scene.add(fillLight);
 
-    const pointLight3 = new THREE.PointLight(0x44ff88, 1, 15);
-    scene.add(pointLight3);
-    pointLight3.position.set(0, 3, -3);
+    // Rim/edge light — bright, from behind, for glass refraction highlights
+    const rimLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    rimLight.position.set(0, 1, -5);
+    scene.add(rimLight);
+
+    // Bottom accent — subtle color for glass-transmission glow
+    const bottomLight = new THREE.PointLight(0x4488ff, 1.5, 12);
+    bottomLight.position.set(0, -4, 2);
+    scene.add(bottomLight);
+
+    // Warm highlight from top-right
+    const warmHighlight = new THREE.PointLight(0xff8866, 1, 10);
+    warmHighlight.position.set(3, 4, 2);
+    scene.add(warmHighlight);
+
+    // Cool highlight from top-left
+    const coolHighlight = new THREE.PointLight(0x6688ff, 0.8, 10);
+    coolHighlight.position.set(-3, 3, 2);
+    scene.add(coolHighlight);
 
     // Camera: z=6 gives comfortable margin around blob (radius ~2.2 max)
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
@@ -265,7 +314,7 @@ async function init() {
     }
 
     // ─── Generative blob: TSL displacement + glass-metal (or fallback) ───
-    const geometry = createBlobGeometry(64);
+    const geometry = createBlobGeometry(4);
     const material = useFallback
         ? createFallbackBlobMaterial(quality)
         : createBlobMaterial(quality);
@@ -295,6 +344,9 @@ async function init() {
         );
     }
 
+    // Sync render resolution + particle sizing to the adaptive DPR
+    applyRendererDpr();
+
     // ─── UI: palettes (R-006) driven by the current scene ─────
     uiPalette = initUIPalette(
         () => currentScene,
@@ -304,6 +356,16 @@ async function init() {
             }
         }
     );
+
+    // ─── Palette card click handlers ─────────────────────────
+    document.querySelectorAll('[data-palette-card]').forEach((card) => {
+        card.addEventListener('click', () => {
+            const index = Number(card.dataset.paletteCard);
+            if (!isNaN(index)) {
+                uiPalette.select(index);
+            }
+        }, { passive: true });
+    });
 
     // ─── UI: magnetic cursor + kinetic typography (R-007) ─────
     initCursor();
@@ -358,6 +420,9 @@ async function init() {
                     currentQuality = qualityTarget;
                     console.info(`[Liquid] Adaptive quality → ${currentQuality} (FPS: ${Math.round(currentFps)})`);
 
+                    // Bugfix(perf): render resolution follows the quality level
+                    applyRendererDpr();
+
                     // Rebuild particles with new count
                     if (particles && isWebGLRenderer) {
                         particles.mesh.geometry.dispose();
@@ -382,6 +447,9 @@ async function init() {
         // Update timer (replaces THREE.Clock)
         timer.update(time);
 
+        // Delta read once per frame (shared by palette easing + impulse decay)
+        const delta = timer.getDelta();
+
         // ── Lenis update (single animation loop) ───────────
         if (scrollModule) {
             scrollModule.render(time);
@@ -392,12 +460,11 @@ async function init() {
 
         // ── Palette update (R-006) ──────────────────────────
         if (uiPalette) {
-            uiPalette.update(timer.getDelta());
+            uiPalette.update(delta);
         }
 
         // ── Cursor interaction (R-004) ─────────────────────
         // Decay impulse (click pulse fades over ~1.5s)
-        const delta = timer.getDelta();
         impulse *= Math.max(0, 1 - delta * 0.8);
 
         // Update material with mouse + impulse (only on TSL node material)

@@ -110,7 +110,7 @@ html, body {
   font-size: var(--step-7);
   font-weight: 600;
   line-height: 0.9;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.02em; /* bugfix: -0.045em made .kin-char boxes overlap */
   text-transform: uppercase;
   background: linear-gradient(100deg, var(--text) 55%, var(--accent) 85%, var(--accent-2));
   -webkit-background-clip: text;
